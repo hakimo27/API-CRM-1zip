@@ -1,0 +1,369 @@
+Подготовь текущий проект к полноценному переносу с Replit на мой собственный сервер/VPS.
+
+Нужно не просто “чтобы код скачался”, а чтобы проект можно было реально развернуть вне Replit без боли.
+
+================================
+1. ОБЩАЯ ЗАДАЧА
+================================
+
+Подготовь проект к deployment outside Replit.
+
+Я хочу иметь возможность:
+1. скачать весь проект
+2. загрузить его на свой сервер
+3. поднять backend, frontend, postgres, redis
+4. импортировать данные
+5. настроить домен, SSL, Telegram, email
+6. запустить проект без зависимости от Replit
+
+Нужен production-ready handoff.
+
+================================
+2. ЧТО НУЖНО СДЕЛАТЬ
+================================
+
+### 2.1 Очистка от Replit-specific вещей
+Проверь проект и убери или изолируй всё, что жестко завязано на Replit:
+- replit-specific config
+- internal URLs Replit
+- dev-only launch scripts Replit
+- временные proxy/workspace настройки
+- replit domain assumptions
+- replit-specific env usage
+- hardcoded replit hostnames
+- replit deployment hacks
+
+Если что-то нельзя убрать, покажи это явно в README.
+
+### 2.2 Подготовить проект к стандартному запуску
+Сделай так, чтобы проект можно было поднять стандартно:
+- frontend
+- admin
+- api
+- postgres
+- redis
+
+Желательно через:
+- docker-compose
+или
+- понятные manual commands
+
+================================
+3. НУЖНЫ ГОТОВЫЕ ФАЙЛЫ ДЛЯ ПЕРЕНОСА
+================================
+
+Подготовь и покажи:
+
+1. `README.md`
+2. `.env.example` для каждого приложения, если нужно
+3. `docker-compose.yml`
+4. `Dockerfile` для:
+   - apps/web
+   - apps/admin
+   - apps/api
+5. production env variable list
+6. startup scripts / package scripts
+7. migration scripts
+8. seed/import scripts
+9. backup/restore instructions for PostgreSQL
+10. image/storage handling instructions
+
+================================
+4. README ДОЛЖЕН СОДЕРЖАТЬ
+================================
+
+Сделай полноценный README для переноса на сервер.
+
+Нужно описать:
+
+### 4.1 Требования к серверу
+- Node.js версия
+- PostgreSQL версия
+- Redis версия
+- npm/pnpm/yarn
+- reverse proxy requirements
+- disk/storage requirements
+
+### 4.2 Структура проекта
+- apps/web
+- apps/admin
+- apps/api
+- packages/shared
+- packages/ui
+- packages/config
+
+### 4.3 Установка
+Пошагово:
+1. клонировать/распаковать проект
+2. установить зависимости
+3. создать `.env`
+4. запустить postgres/redis
+5. прогнать миграции
+6. запустить импорт
+7. собрать frontend/admin
+8. поднять production services
+
+### 4.4 ENV переменные
+Полный список:
+- database
+- redis
+- jwt
+- auth
+- email
+- telegram
+- storage
+- public urls
+- admin url
+- api url
+- webhook secret
+- chat settings
+- upload settings
+
+### 4.5 Миграции
+- как запускать drizzle migrations
+- как проверить схему
+- как переинициализировать локально
+- как не потерять данные
+
+### 4.6 Импорт данных
+- как импортировать JSON с сайта
+- как скачать картинки
+- как перезапустить импорт безопасно
+- как избежать дублей
+
+### 4.7 Deployment
+- как собрать проект
+- как запустить в production
+- как запускать после перезагрузки сервера
+- как подключить nginx/caddy
+- как прокинуть домены и субдомены
+
+### 4.8 Troubleshooting
+- частые ошибки
+- Telegram webhook
+- DB connection
+- Redis
+- build errors
+- env mismatch
+
+================================
+5. DOCKER / DOCKER COMPOSE
+================================
+
+Подготовь Docker setup.
+
+Нужен `docker-compose.yml` как минимум для:
+- postgres
+- redis
+- api
+- web
+- admin
+
+Если лучше разделить dev/prod:
+- `docker-compose.yml`
+- `docker-compose.prod.yml`
+
+Убедись, что:
+- сервисы общаются по внутренней сети
+- env читаются корректно
+- volumes настроены
+- database data сохраняются
+- uploads/storage сохраняются
+- restart policy задана
+
+================================
+6. ENV ПЕРЕМЕННЫЕ
+================================
+
+Сделай полный список env variables.
+
+Отдельно покажи:
+- какие обязательны
+- какие опциональны
+- какие только для production
+- какие только для dev
+
+Пример групп:
+- DATABASE_URL
+- REDIS_URL
+- JWT_SECRET
+- JWT_REFRESH_SECRET
+- APP_URL
+- API_URL
+- WEB_URL
+- ADMIN_URL
+- SMTP_HOST
+- SMTP_PORT
+- SMTP_USER
+- SMTP_PASS
+- SMTP_FROM
+- TELEGRAM_BOT_TOKEN
+- TELEGRAM_MANAGER_GROUP_CHAT_ID
+- TELEGRAM_WEBHOOK_SECRET
+- STORAGE_DRIVER
+- S3 keys если есть
+- PUBLIC_UPLOADS_URL
+
+И отдельно:
+- какие secrets нужно перенести вручную
+- какие нельзя коммитить в репозиторий
+
+================================
+7. ПЕРЕНОС БАЗЫ ДАННЫХ
+================================
+
+Нужно подготовить инструкции по БД.
+
+Покажи:
+1. как сделать backup PostgreSQL
+2. как восстановить backup на новом сервере
+3. как прогнать миграции
+4. как загрузить seed/import data
+5. как проверить, что схема соответствует актуальной версии
+
+Если проект уже содержит реальные данные:
+- опиши export/import process
+- не полагайся только на миграции
+- дай команды дампа
+
+================================
+8. ПЕРЕНОС СТАТИЧЕСКИХ ФАЙЛОВ И КАРТИНОК
+================================
+
+Покажи, как переносить:
+- загруженные изображения
+- скачанные с monitorrr.narod.ru картинки
+- логотипы
+- favicon
+- uploaded files
+- attachments чата, если есть
+
+Нужно:
+- указать где они лежат
+- как их бэкапить
+- как монтировать volume
+- как не потерять их при деплое
+
+================================
+9. TELEGRAM / EMAIL / WEBHOOKS
+================================
+
+Отдельно покажи, что нужно перенастроить после переноса.
+
+Telegram:
+- bot token
+- group chat id
+- webhook url
+- webhook secret
+- topics settings
+
+Email:
+- SMTP config
+- sender name
+- sender email
+- templates
+
+Webhooks:
+- какие endpoints должны быть доступны публично
+- какие URL нужно прописать после смены домена
+- что завязано на старый replit URL
+
+================================
+10. ДОМЕНЫ И REVERSE PROXY
+================================
+
+Нужны инструкции по доменам.
+
+Покажи, как настроить:
+- основной домен
+- subdomain sale
+- subdomain tours
+- subdomain info
+- subdomain/admin path, если нужно
+
+Опиши пример конфигурации для:
+- Nginx
+или
+- Caddy
+
+Нужно:
+- SSL
+- проксирование api
+- проксирование web
+- проксирование admin
+- websocket support for chat
+- headers/cookies/cors if needed
+
+================================
+11. PACKAGE SCRIPTS
+================================
+
+Приведи проект к понятным scripts.
+
+Нужны команды типа:
+- dev
+- build
+- start
+- start:prod
+- db:migrate
+- db:push
+- db:seed
+- import:site-seed
+- import:download-images
+- lint
+- test
+
+Убедись, что scripts работают вне Replit.
+
+================================
+12. ПРОВЕРКА ГОТОВНОСТИ К ПЕРЕНОСУ
+================================
+
+Сделай checklist.
+
+Нужно проверить:
+- проект запускается локально без Replit
+- env не завязаны на Replit
+- ссылки не завязаны на Replit URL
+- API работает
+- admin работает
+- web работает
+- DB миграции работают
+- Telegram config можно перенастроить
+- settings читаются из БД
+- storage не теряется
+- импорт сайта работает
+- docker compose поднимается
+
+================================
+13. ФОРМАТ РЕЗУЛЬТАТА
+================================
+
+Покажи:
+1. какие файлы добавлены/изменены
+2. готовый README
+3. docker-compose
+4. Dockerfiles
+5. список env variables
+6. команды миграции/импорта
+7. что нужно сделать руками после переноса
+8. какие replit-specific зависимости были удалены/исправлены
+9. что протестировано
+
+================================
+14. ОЧЕНЬ ВАЖНО
+================================
+
+Не отвечай общими словами.
+Подготовь проект реально к handoff на внешний сервер.
+
+Сделай так, чтобы я мог:
+- скачать проект
+- залить на VPS
+- прописать env
+- поднять docker compose
+- прогнать миграции
+- импортировать данные
+- запустить сайт
+
+Если где-то есть завязка на Replit, укажи ее явно и предложи замену.
