@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Post, Body, Param, Query } from "@nestjs/common";
+import { Controller, Get, Put, Post, Body, Param } from "@nestjs/common";
 import { SettingsService } from "./settings.service.js";
 import { Public } from "../common/decorators/public.decorator.js";
 import { Roles } from "../common/decorators/roles.decorator.js";
@@ -10,7 +10,7 @@ export class SettingsController {
   @Public()
   @Get("public")
   getPublicSettings() {
-    return this.settingsService.getByGroup("general");
+    return this.settingsService.getPublic();
   }
 
   @Get()
@@ -33,8 +33,8 @@ export class SettingsController {
 
   @Put()
   @Roles("admin")
-  setBulk(@Body() body: Record<string, unknown>, @Query("group") group?: string) {
-    return this.settingsService.setBulk(body, group);
+  setBulk(@Body() body: Record<string, unknown>) {
+    return this.settingsService.setBulk(body);
   }
 
   @Put(":key")

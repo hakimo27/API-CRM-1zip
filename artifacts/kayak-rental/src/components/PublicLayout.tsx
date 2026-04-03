@@ -1,25 +1,55 @@
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
-import { ShoppingCart, Menu, X, User, Phone, Mail } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { ShoppingCart, Menu, X, User, Phone, Mail, MessageCircle, MapPin, Clock } from 'lucide-react';
 import { useState } from 'react';
+
+const API = '/api';
+
+function usePublicSettings() {
+  return useQuery<Record<string, unknown>>({
+    queryKey: ['public-settings'],
+    queryFn: () => fetch(`${API}/settings/public`).then(r => r.json()),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+function str(v: unknown, fallback = ''): string {
+  return (v && typeof v === 'string' && v.trim()) ? v.trim() : fallback;
+}
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const { itemCount } = useCart();
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const { data: settings = {} } = usePublicSettings();
+
+  const companyName  = str(settings['general.company_name'], 'КаякРент');
+  const phone        = str(settings['contacts.phone']);
+  const phone2       = str(settings['contacts.phone2']);
+  const email        = str(settings['contacts.email']);
+  const address      = str(settings['contacts.address']);
+  const schedule     = str(settings['contacts.schedule']);
+  const tgUsername   = str(settings['contacts.telegram']);
+  const vkUrl        = str(settings['contacts.vk']);
+  const footerText   = str(settings['general.footer_text'], 'Аренда байдарок, каноэ и SUP-досок в Москве и Подмосковье');
+  const copyright    = str(settings['general.copyright'], `КаякРент ${new Date().getFullYear()}`);
+  const primaryColor = str(settings['branding.primary_color'], '#2563eb');
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <header className="bg-white shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
+            {/* Logo */}
             <Link href="/" className="flex items-center gap-2 font-bold text-xl text-blue-700">
               <span className="text-2xl">🛶</span>
-              <span>КаякРент</span>
+              <span>{companyName}</span>
             </Link>
 
+            {/* Desktop nav */}
             <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
               <Link href="/catalog" className="text-gray-700 hover:text-blue-600 transition-colors">Каталог</Link>
               <Link href="/tours" className="text-gray-700 hover:text-blue-600 transition-colors">Туры</Link>
@@ -27,7 +57,16 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
               <Link href="/info/contacts" className="text-gray-700 hover:text-blue-600 transition-colors">Контакты</Link>
             </nav>
 
-            <div className="flex items-center gap-3">
+            {/* Right side: cart + user */}
+            <div className="flex items-center gap-2">
+              {phone && (
+                <a href={`tel:${phone.replace(/\D/g, '')}`}
+                  className="hidden lg:flex items-center gap-1.5 text-sm text-gray-600 hover:text-blue-600 transition-colors px-2">
+                  <Phone className="w-4 h-4" />
+                  <span>{phone}</span>
+                </a>
+              )}
+
               <Link href="/cart" className="relative p-2 text-gray-700 hover:text-blue-600 transition-colors">
                 <ShoppingCart className="w-5 h-5" />
                 {itemCount > 0 && (
@@ -39,30 +78,31 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
 
               {user ? (
                 <div className="relative">
-                  <button
-                    onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
-                  >
-                    <User className="w-4 h-4" />
-                    <span className="hidden md:inline">{user.firstName}</span>
+                  <button onClick={() => setDropdownOpen(!dropdownOpen)}
+                    className="flex items-center gap-2 p-2 text-gray-700 hover:text-blue-600 transition-colors rounded-lg hover:bg-gray-50">
+                    <User className="w-5 h-5" />
+                    <span className="hidden md:inline text-sm font-medium">{user.firstName}</span>
                   </button>
                   {dropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-52 bg-white rounded-lg shadow-xl border border-gray-100 z-50">
-                      <Link href="/account" onClick={() => setDropdownOpen(false)} className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">Мой аккаунт</Link>
-                      <Link href="/account/orders" onClick={() => setDropdownOpen(false)} className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">Мои заказы</Link>
-                      {['admin', 'super_admin', 'manager', 'operator'].includes(user.role) && (
-                        <a href="/crm" className="block px-4 py-2.5 text-sm text-blue-600 hover:bg-blue-50">Панель управления</a>
-                      )}
-                      <div className="border-t border-gray-100 mt-1" />
-                      <button onClick={() => { logout(); setDropdownOpen(false); }} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50">Выйти</button>
-                    </div>
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
+                      <div className="absolute right-0 mt-1 w-52 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1">
+                        <Link href="/account" onClick={() => setDropdownOpen(false)}
+                          className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">Мой аккаунт</Link>
+                        <Link href="/account/orders" onClick={() => setDropdownOpen(false)}
+                          className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">Мои заказы</Link>
+                        {['admin', 'super_admin', 'superadmin', 'manager'].includes(user.role) && (
+                          <a href="/crm"
+                            className="block px-4 py-2.5 text-sm text-blue-600 hover:bg-blue-50">Панель управления</a>
+                        )}
+                        <div className="border-t border-gray-100 my-1" />
+                        <button onClick={() => { logout(); setDropdownOpen(false); }}
+                          className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50">Выйти</button>
+                      </div>
+                    </>
                   )}
                 </div>
-              ) : (
-                <Link href="/login" className="text-sm font-medium px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                  Войти
-                </Link>
-              )}
+              ) : null /* Кнопка "Войти" убрана — основной CTA - бронирование и каталог */}
 
               <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden p-2 text-gray-700">
                 {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -71,12 +111,25 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           </div>
         </div>
 
+        {/* Mobile menu */}
         {menuOpen && (
-          <div className="md:hidden border-t border-gray-100 bg-white px-4 py-4 space-y-3">
-            <Link href="/catalog" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-1">Каталог</Link>
-            <Link href="/tours" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-1">Туры</Link>
-            <Link href="/info/about" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-1">О нас</Link>
-            <Link href="/info/contacts" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-1">Контакты</Link>
+          <div className="md:hidden border-t border-gray-100 bg-white px-4 py-4 space-y-1">
+            <Link href="/catalog" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-2 px-2 rounded-lg hover:bg-gray-50">Каталог</Link>
+            <Link href="/tours" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-2 px-2 rounded-lg hover:bg-gray-50">Туры</Link>
+            <Link href="/info/about" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-2 px-2 rounded-lg hover:bg-gray-50">О нас</Link>
+            <Link href="/info/contacts" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-2 px-2 rounded-lg hover:bg-gray-50">Контакты</Link>
+            {phone && (
+              <a href={`tel:${phone.replace(/\D/g, '')}`} onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2 text-blue-600 font-medium py-2 px-2 rounded-lg hover:bg-blue-50">
+                <Phone className="w-4 h-4" /> {phone}
+              </a>
+            )}
+            {user && (
+              <Link href="/account" onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2 text-gray-700 font-medium py-2 px-2 rounded-lg hover:bg-gray-50">
+                <User className="w-4 h-4" /> Мой аккаунт
+              </Link>
+            )}
           </div>
         )}
       </header>
@@ -86,39 +139,88 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <footer className="bg-gray-900 text-gray-300 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            {/* Brand */}
             <div>
-              <div className="flex items-center gap-2 font-bold text-xl text-white mb-4">
+              <div className="flex items-center gap-2 font-bold text-xl text-white mb-3">
                 <span className="text-2xl">🛶</span>
-                <span>КаякРент</span>
+                <span>{companyName}</span>
               </div>
-              <p className="text-sm text-gray-400">Аренда байдарок, каноэ и SUP-досок в Москве и Подмосковье</p>
+              <p className="text-sm text-gray-400 leading-relaxed">{footerText}</p>
             </div>
+
+            {/* Catalog */}
             <div>
               <h3 className="font-semibold text-white mb-3">Каталог</h3>
               <ul className="space-y-2 text-sm">
                 <li><Link href="/catalog?category=kayaks" className="hover:text-white transition-colors">Байдарки</Link></li>
                 <li><Link href="/catalog?category=canoes" className="hover:text-white transition-colors">Каноэ</Link></li>
                 <li><Link href="/catalog?category=sup" className="hover:text-white transition-colors">SUP-доски</Link></li>
+                <li><Link href="/tours" className="hover:text-white transition-colors">Туры и рафтинг</Link></li>
               </ul>
             </div>
+
+            {/* Info */}
             <div>
               <h3 className="font-semibold text-white mb-3">Информация</h3>
               <ul className="space-y-2 text-sm">
                 <li><Link href="/info/about" className="hover:text-white transition-colors">О компании</Link></li>
                 <li><Link href="/info/delivery" className="hover:text-white transition-colors">Доставка и возврат</Link></li>
                 <li><Link href="/info/faq" className="hover:text-white transition-colors">Вопросы и ответы</Link></li>
+                <li><Link href="/info/contacts" className="hover:text-white transition-colors">Контакты</Link></li>
               </ul>
             </div>
+
+            {/* Contacts */}
             <div>
               <h3 className="font-semibold text-white mb-3">Контакты</h3>
-              <ul className="space-y-2 text-sm">
-                <li className="flex items-center gap-2"><Phone className="w-4 h-4" /><a href="tel:84951234567" className="hover:text-white transition-colors">8 (495) 123-45-67</a></li>
-                <li className="flex items-center gap-2"><Mail className="w-4 h-4" /><a href="mailto:info@kayak.ru" className="hover:text-white transition-colors">info@kayak.ru</a></li>
+              <ul className="space-y-2.5 text-sm">
+                {phone && (
+                  <li className="flex items-start gap-2">
+                    <Phone className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <a href={`tel:${phone.replace(/\D/g, '')}`} className="hover:text-white transition-colors block">{phone}</a>
+                      {phone2 && <a href={`tel:${phone2.replace(/\D/g, '')}`} className="hover:text-white transition-colors block">{phone2}</a>}
+                    </div>
+                  </li>
+                )}
+                {email && (
+                  <li className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 flex-shrink-0" />
+                    <a href={`mailto:${email}`} className="hover:text-white transition-colors">{email}</a>
+                  </li>
+                )}
+                {address && (
+                  <li className="flex items-start gap-2">
+                    <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <span>{address}</span>
+                  </li>
+                )}
+                {schedule && (
+                  <li className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 flex-shrink-0" />
+                    <span>{schedule}</span>
+                  </li>
+                )}
+                {tgUsername && (
+                  <li className="flex items-center gap-2">
+                    <MessageCircle className="w-4 h-4 flex-shrink-0" />
+                    <a href={`https://t.me/${tgUsername}`} target="_blank" rel="noopener noreferrer"
+                      className="hover:text-white transition-colors">@{tgUsername}</a>
+                  </li>
+                )}
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-500">
-            © {new Date().getFullYear()} КаякРент. Все права защищены.
+
+          <div className="border-t border-gray-800 mt-10 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
+            <span>© {new Date().getFullYear()} {copyright}</span>
+            <div className="flex items-center gap-4">
+              {vkUrl && <a href={vkUrl} target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">ВКонтакте</a>}
+              {tgUsername && (
+                <a href={`https://t.me/${tgUsername}`} target="_blank" rel="noopener noreferrer"
+                  className="hover:text-gray-300 transition-colors">Telegram</a>
+              )}
+            </div>
           </div>
         </div>
       </footer>
