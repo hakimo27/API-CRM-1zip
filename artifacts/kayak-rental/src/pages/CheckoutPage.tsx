@@ -1,276 +1,206 @@
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
-import { Shield, ChevronLeft, Loader2 } from "lucide-react";
-import { useCart } from "@/hooks/useCart";
-import { useCreateOrder } from "@workspace/api-client-react";
-import { clearCart, getTotalDeposit } from "@/lib/cart";
+import { useState } from 'react';
+import { Link, useLocation } from 'wouter';
+import { Shield, ChevronLeft, Loader2 } from 'lucide-react';
+import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/lib/api';
+
+interface OrderForm {
+  firstName: string; lastName: string; phone: string; email: string; comment: string;
+  deliveryType: 'pickup' | 'delivery'; deliveryAddress: string;
+}
 
 export default function CheckoutPage() {
-  const { cart, clear } = useCart();
+  const { items, totalAmount, clearCart } = useCart();
+  const { user } = useAuth();
   const [, navigate] = useLocation();
-  const createOrder = useCreateOrder();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const [form, setForm] = useState({
-    customerName: "",
-    customerPhone: "",
-    customerEmail: "",
-    communicationChannel: "phone",
-    deliveryType: "pickup",
-    deliveryAddress: "",
-    comment: "",
-    privacyAccepted: false,
+  const [form, setForm] = useState<OrderForm>({
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    phone: '', email: user?.email || '',
+    comment: '', deliveryType: 'pickup', deliveryAddress: '',
   });
-  const [error, setError] = useState<string | null>(null);
 
-  const handleChange = (field: string, value: string | boolean) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  };
+  const setField = (field: keyof OrderForm, value: string) =>
+    setForm(prev => ({ ...prev, [field]: value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-
-    if (!cart.startDate || !cart.endDate) {
-      setError("Вернитесь в корзину и выберите даты аренды");
-      return;
-    }
-
-    if (cart.items.length === 0) {
-      setError("Корзина пуста");
-      return;
-    }
-
-    if (!form.privacyAccepted) {
-      setError("Необходимо согласие на обработку персональных данных");
-      return;
-    }
+    if (items.length === 0) return;
+    setLoading(true);
+    setError('');
 
     try {
-      const data = await createOrder.mutateAsync({
-        items: cart.items.map((item) => ({
+      const orderData = {
+        customerName: `${form.firstName} ${form.lastName}`.trim(),
+        customerPhone: form.phone,
+        customerEmail: form.email,
+        deliveryType: form.deliveryType,
+        deliveryAddress: form.deliveryAddress || undefined,
+        notes: form.comment || undefined,
+        items: items.map(item => ({
           productId: item.productId,
+          tariffId: item.tariffId,
           quantity: item.quantity,
+          startDate: item.startDate,
+          endDate: item.endDate,
+          pricePerDay: item.pricePerDay,
+          totalPrice: item.totalPrice,
         })),
-        startDate: cart.startDate,
-        endDate: cart.endDate,
-        customerName: form.customerName,
-        customerPhone: form.customerPhone,
-        customerEmail: form.customerEmail || undefined,
-        communicationChannel: form.communicationChannel as any,
-        deliveryType: form.deliveryType as any,
-        deliveryAddress: form.deliveryType === "delivery" ? form.deliveryAddress : undefined,
-        comment: form.comment || undefined,
-        privacyAccepted: true,
-      });
+        totalAmount,
+      };
 
-      clear();
-      navigate(`/order/${data.id}`);
+      const result = await api.post<{ orderNumber: string; id: number }>('/orders', orderData);
+      clearCart();
+      navigate(`/order/${result.orderNumber}`);
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? err?.message ?? "Ошибка при создании заказа");
+      setError(err.message || 'Ошибка при оформлении заказа');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const totalDeposit = getTotalDeposit(cart);
-
-  if (cart.items.length === 0) {
+  if (items.length === 0) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-20 text-center">
-        <div className="text-5xl mb-4">🛒</div>
-        <h1 className="text-xl font-bold text-gray-900 mb-4">Корзина пуста</h1>
-        <Link href="/catalog">
-          <button className="bg-blue-600 text-white px-6 py-2.5 rounded-xl hover:bg-blue-700">
-            В каталог
-          </button>
-        </Link>
+      <div className="max-w-3xl mx-auto px-4 py-20 text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Корзина пуста</h2>
+        <Link href="/catalog" className="text-blue-600 hover:underline">Перейти в каталог</Link>
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <Link href="/cart">
-        <button className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 mb-6">
-          <ChevronLeft className="w-4 h-4" />
-          Назад в корзину
-        </button>
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <Link href="/cart" className="inline-flex items-center gap-1 text-gray-500 hover:text-blue-600 mb-6 text-sm transition-colors">
+        <ChevronLeft className="w-4 h-4" />
+        Корзина
       </Link>
 
       <h1 className="text-2xl font-bold text-gray-900 mb-8">Оформление заказа</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <form onSubmit={handleSubmit} className="md:col-span-2 space-y-5">
-          {/* Contact info */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="text-sm font-semibold text-gray-700 mb-4">Контактные данные</div>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Имя *</label>
-                <input
-                  type="text"
-                  required
-                  value={form.customerName}
-                  onChange={(e) => handleChange("customerName", e.target.value)}
-                  placeholder="Иван Иванов"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Телефон *</label>
-                <input
-                  type="tel"
-                  required
-                  value={form.customerPhone}
-                  onChange={(e) => handleChange("customerPhone", e.target.value)}
-                  placeholder="+7 (999) 000-00-00"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Email</label>
-                <input
-                  type="email"
-                  value={form.customerEmail}
-                  onChange={(e) => handleChange("customerEmail", e.target.value)}
-                  placeholder="ivan@example.com"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Предпочтительный способ связи</label>
-                <select
-                  value={form.communicationChannel}
-                  onChange={(e) => handleChange("communicationChannel", e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                >
-                  <option value="phone">Телефон</option>
-                  <option value="telegram">Telegram</option>
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="email">Email</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Delivery */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="text-sm font-semibold text-gray-700 mb-4">Способ получения</div>
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              {[
-                { value: "pickup", label: "Самовывоз", desc: "Забрать со склада" },
-                { value: "delivery", label: "Доставка", desc: "Доставим по адресу" },
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => handleChange("deliveryType", opt.value)}
-                  className={`p-3 rounded-lg border-2 text-left transition-colors ${
-                    form.deliveryType === opt.value
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <div className="font-semibold text-sm text-gray-900">{opt.label}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">{opt.desc}</div>
-                </button>
-              ))}
-            </div>
-            {form.deliveryType === "delivery" && (
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Адрес доставки *</label>
-                <input
-                  type="text"
-                  required={form.deliveryType === "delivery"}
-                  value={form.deliveryAddress}
-                  onChange={(e) => handleChange("deliveryAddress", e.target.value)}
-                  placeholder="Улица, дом, квартира"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Comment */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="text-sm font-semibold text-gray-700 mb-3">Комментарий</div>
-            <textarea
-              value={form.comment}
-              onChange={(e) => handleChange("comment", e.target.value)}
-              placeholder="Дополнительные пожелания, маршрут, опыт сплава..."
-              rows={3}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            />
-          </div>
-
-          {/* Privacy */}
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={form.privacyAccepted}
-              onChange={(e) => handleChange("privacyAccepted", e.target.checked)}
-              className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <span className="text-sm text-gray-600 leading-relaxed">
-              Я согласен на обработку персональных данных и принимаю{" "}
-              <Link href="/pages/rental-terms">
-                <span className="text-blue-600 hover:underline">правила аренды</span>
-              </Link>
-            </span>
-          </label>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={createOrder.isPending}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-3.5 rounded-xl font-semibold text-base transition-colors flex items-center justify-center gap-2"
-          >
-            {createOrder.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Оформление...
-              </>
-            ) : (
-              "Отправить заказ"
-            )}
-          </button>
-        </form>
-
-        {/* Order summary */}
-        <div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="text-sm font-semibold text-gray-700 mb-4">Ваш заказ</div>
-            {cart.startDate && cart.endDate && (
-              <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-2 mb-3">
-                {cart.startDate} — {cart.endDate}
-              </div>
-            )}
-            <div className="space-y-3">
-              {cart.items.map((item) => (
-                <div key={item.productId} className="flex gap-2 text-sm">
-                  <div className="flex-1 text-gray-700 line-clamp-2 leading-tight">{item.productName}</div>
-                  <div className="text-gray-500 shrink-0">×{item.quantity}</div>
+      <form onSubmit={handleSubmit}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Form */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Contact */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <h2 className="font-semibold text-gray-900 mb-4">Контактные данные</h2>
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Имя *</label>
+                  <input required value={form.firstName} onChange={e => setField('firstName', e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="Иван" />
                 </div>
-              ))}
-            </div>
-            {totalDeposit > 0 && (
-              <div className="mt-4 pt-3 border-t border-gray-100">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Залог:</span>
-                  <span className="font-semibold text-amber-700">{totalDeposit.toLocaleString("ru-RU")} ₽</span>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Фамилия</label>
+                  <input value={form.lastName} onChange={e => setField('lastName', e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="Иванов" />
                 </div>
               </div>
-            )}
-            <div className="mt-3 bg-blue-50 rounded-lg p-3 text-xs text-blue-700 flex gap-2">
-              <Shield className="w-4 h-4 shrink-0 mt-0.5" />
-              Привозите только залог — из него берём оплату. Остаток возвращаем.
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Телефон *</label>
+                  <input required type="tel" value={form.phone} onChange={e => setField('phone', e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="+7 (999) 000-00-00" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+                  <input type="email" value={form.email} onChange={e => setField('email', e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="email@example.ru" />
+                </div>
+              </div>
+            </div>
+
+            {/* Delivery */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <h2 className="font-semibold text-gray-900 mb-4">Способ получения</h2>
+              <div className="space-y-3 mb-4">
+                {[
+                  { value: 'pickup', label: 'Самовывоз', desc: 'Москва, ул. Речная, 15' },
+                  { value: 'delivery', label: 'Доставка', desc: 'Доставим к месту старта маршрута' },
+                ].map(opt => (
+                  <label key={opt.value} className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+                    form.deliveryType === opt.value ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
+                  }`}>
+                    <input type="radio" name="delivery" value={opt.value} checked={form.deliveryType === opt.value}
+                      onChange={e => setField('deliveryType', e.target.value)} className="mt-0.5" />
+                    <div>
+                      <div className="font-medium text-gray-900">{opt.label}</div>
+                      <div className="text-sm text-gray-500">{opt.desc}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {form.deliveryType === 'delivery' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Адрес доставки *</label>
+                  <input required={form.deliveryType === 'delivery'} value={form.deliveryAddress}
+                    onChange={e => setField('deliveryAddress', e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="Введите адрес..." />
+                </div>
+              )}
+            </div>
+
+            {/* Comment */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <h2 className="font-semibold text-gray-900 mb-4">Комментарий к заказу</h2>
+              <textarea
+                value={form.comment} onChange={e => setField('comment', e.target.value)} rows={3}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none"
+                placeholder="Дополнительная информация..." />
+            </div>
+          </div>
+
+          {/* Summary */}
+          <div>
+            <div className="bg-white rounded-2xl border border-gray-100 p-6 sticky top-24">
+              <h3 className="font-semibold text-gray-900 mb-4">Ваш заказ</h3>
+              <div className="space-y-3 mb-4">
+                {items.map(item => (
+                  <div key={item.productId} className="flex justify-between text-sm">
+                    <div>
+                      <div className="text-gray-900 font-medium">{item.name}</div>
+                      <div className="text-gray-500">{item.days} дн. × {item.quantity} шт.</div>
+                    </div>
+                    <span className="font-medium">{item.totalPrice.toLocaleString('ru-RU')} ₽</span>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-gray-100 pt-4 mb-6">
+                <div className="flex justify-between font-bold text-lg">
+                  <span>Итого</span>
+                  <span className="text-blue-700">{totalAmount.toLocaleString('ru-RU')} ₽</span>
+                </div>
+              </div>
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-xl text-sm">{error}</div>
+              )}
+
+              <button
+                type="submit" disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                {loading ? 'Оформляем...' : 'Оформить заказ'}
+              </button>
+
+              <div className="flex items-center gap-2 mt-3 text-xs text-gray-500">
+                <Shield className="w-4 h-4" />
+                Ваши данные защищены
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

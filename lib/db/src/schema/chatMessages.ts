@@ -11,6 +11,7 @@ export const chatMessagesTable = pgTable("chat_messages", {
   id: serial("id").primaryKey(),
   sessionId: integer("session_id").notNull().references(() => chatSessionsTable.id, { onDelete: "cascade" }),
   sender: text("sender").notNull().$type<MessageSender>(),
+  senderName: text("sender_name"),
   content: text("content").notNull(),
   readByManager: boolean("read_by_manager").notNull().default(false),
   telegramMessageId: text("telegram_message_id"),

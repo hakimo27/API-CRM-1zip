@@ -3,7 +3,11 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node"]
+    "types": ["node"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "isolatedModules": false,
+    "strictPropertyInitialization": false
   },
   "include": ["src"],
   "references": [
@@ -11,7 +15,7 @@
       "path": "../../lib/db"
     },
     {
-      "path": "../../lib/api-zod"
+      "path": "../../lib/shared"
     }
   ]
 }

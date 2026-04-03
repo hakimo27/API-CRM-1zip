@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/crm/"
+title = "Admin CRM"
+version = "1.0.0"
+id = "artifacts/admin-crm"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/crm/" ]
+localPort = 24996
+
+[services.development]
+run = "pnpm --filter @workspace/admin-crm run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/admin-crm", "run", "build" ]
+publicDir = "artifacts/admin-crm/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24996"
+BASE_PATH = "/crm/"

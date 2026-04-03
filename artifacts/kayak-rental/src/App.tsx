@@ -1,56 +1,30 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/not-found";
-import PublicLayout from "@/components/PublicLayout";
-import AdminLayout from "@/components/AdminLayout";
-import HomePage from "@/pages/HomePage";
-import CatalogPage from "@/pages/CatalogPage";
-import ProductPage from "@/pages/ProductPage";
-import CartPage from "@/pages/CartPage";
-import CheckoutPage from "@/pages/CheckoutPage";
-import OrderConfirmPage from "@/pages/OrderConfirmPage";
-import StaticPage from "@/pages/StaticPage";
-import DashboardPage from "@/pages/admin/DashboardPage";
-import OrdersPage from "@/pages/admin/OrdersPage";
-import OrderDetailPage from "@/pages/admin/OrderDetailPage";
-import CustomersPage from "@/pages/admin/CustomersPage";
-import CustomerDetailPage from "@/pages/admin/CustomerDetailPage";
-import InventoryPage from "@/pages/admin/InventoryPage";
-import AdminChatPage from "@/pages/admin/ChatPage";
-import ReportsPage from "@/pages/admin/ReportsPage";
-import AdminProductsPage from "@/pages/admin/ProductsPage";
+import { Switch, Route, Router as WouterRouter } from 'wouter';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from '@/components/ui/toaster';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { CartProvider } from '@/contexts/CartContext';
+import PublicLayout from '@/components/PublicLayout';
+import HomePage from '@/pages/HomePage';
+import CatalogPage from '@/pages/CatalogPage';
+import ProductPage from '@/pages/ProductPage';
+import CartPage from '@/pages/CartPage';
+import CheckoutPage from '@/pages/CheckoutPage';
+import OrderConfirmPage from '@/pages/OrderConfirmPage';
+import LoginPage from '@/pages/LoginPage';
+import RegisterPage from '@/pages/RegisterPage';
+import AccountPage from '@/pages/AccountPage';
+import ToursPage from '@/pages/ToursPage';
+import InfoPage from '@/pages/InfoPage';
+import NotFound from '@/pages/not-found';
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      retry: 1,
-      staleTime: 30_000,
-    },
+    queries: { staleTime: 60_000, retry: 1 },
   },
 });
 
-function AdminSection() {
-  return (
-    <AdminLayout>
-      <Switch>
-        <Route path="/admin" component={DashboardPage} />
-        <Route path="/admin/orders" component={OrdersPage} />
-        <Route path="/admin/orders/:id" component={OrderDetailPage} />
-        <Route path="/admin/customers" component={CustomersPage} />
-        <Route path="/admin/customers/:id" component={CustomerDetailPage} />
-        <Route path="/admin/inventory" component={InventoryPage} />
-        <Route path="/admin/chat" component={AdminChatPage} />
-        <Route path="/admin/reports" component={ReportsPage} />
-        <Route path="/admin/products" component={AdminProductsPage} />
-        <Route component={NotFound} />
-      </Switch>
-    </AdminLayout>
-  );
-}
-
-function PublicSection() {
+function AppRoutes() {
   return (
     <PublicLayout>
       <Switch>
@@ -59,35 +33,32 @@ function PublicSection() {
         <Route path="/catalog/:slug" component={ProductPage} />
         <Route path="/cart" component={CartPage} />
         <Route path="/checkout" component={CheckoutPage} />
-        <Route path="/order/:id" component={OrderConfirmPage} />
-        <Route path="/pages/:slug" component={StaticPage} />
+        <Route path="/order/:number" component={OrderConfirmPage} />
+        <Route path="/login" component={LoginPage} />
+        <Route path="/register" component={RegisterPage} />
+        <Route path="/account" component={AccountPage} />
+        <Route path="/account/orders" component={AccountPage} />
+        <Route path="/tours" component={ToursPage} />
+        <Route path="/info/:slug" component={InfoPage} />
         <Route component={NotFound} />
       </Switch>
     </PublicLayout>
   );
 }
 
-function Router() {
-  return (
-    <Switch>
-      <Route path="/admin" component={AdminSection} />
-      <Route path="/admin/:rest*" component={AdminSection} />
-      <Route component={PublicSection} />
-    </Switch>
-  );
-}
-
-function App() {
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
+        <AuthProvider>
+          <CartProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+              <AppRoutes />
+            </WouterRouter>
+            <Toaster />
+          </CartProvider>
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
 }
-
-export default App;
