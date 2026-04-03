@@ -31,6 +31,7 @@ export const productsTable = pgTable("products", {
   ogDescription: text("og_description"),
   canonicalUrl: text("canonical_url"),
   robots: text("robots").default("index,follow"),
+  domainScope: text("domain_scope").notNull().default("rental"),
   sortOrder: integer("sort_order").default(0),
   totalStock: integer("total_stock").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

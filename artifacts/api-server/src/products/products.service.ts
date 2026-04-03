@@ -93,15 +93,30 @@ export class ProductsService {
     return { ...product, images, tariffs };
   }
 
-  async create(data: typeof productsTable.$inferInsert) {
-    const [created] = await this.db.insert(productsTable).values(data).returning();
-    return created;
+  async create(data: any) {
+    const { tariffs, ...productData } = data;
+    const [created] = await this.db.insert(productsTable).values(productData).returning();
+    if (tariffs?.length) {
+      await this.db.insert(tariffsTable).values(
+        tariffs.map((t: any) => ({ ...t, productId: created.id }))
+      );
+    }
+    return this.findById(created.id);
   }
 
-  async update(id: number, data: Partial<typeof productsTable.$inferInsert>) {
-    const [updated] = await this.db.update(productsTable).set(data).where(eq(productsTable.id, id)).returning();
+  async update(id: number, data: any) {
+    const { tariffs, ...productData } = data;
+    const [updated] = await this.db.update(productsTable).set(productData).where(eq(productsTable.id, id)).returning();
     if (!updated) throw new NotFoundException("Товар не найден");
-    return updated;
+    if (tariffs !== undefined) {
+      await this.db.delete(tariffsTable).where(eq(tariffsTable.productId, id));
+      if (tariffs.length > 0) {
+        await this.db.insert(tariffsTable).values(
+          tariffs.map((t: any) => ({ type: t.type, label: t.label, pricePerDay: t.pricePerDay, minDays: t.minDays || null, description: t.description || null, productId: id }))
+        );
+      }
+    }
+    return this.findById(id);
   }
 
   async delete(id: number) {
