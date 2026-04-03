@@ -3,20 +3,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   LayoutDashboard, ShoppingBag, Package, Users, Tag, MapPin,
   MessageSquare, Settings, LogOut, Menu, X, User, Waves, ChevronRight,
-  Bell
 } from 'lucide-react';
 import { useState } from 'react';
 
 const NAV_ITEMS = [
-  { href: '/crm', label: 'Дашборд', icon: LayoutDashboard, exact: true },
-  { href: '/crm/orders', label: 'Заказы', icon: ShoppingBag },
-  { href: '/crm/inventory', label: 'Инвентарь', icon: Package },
-  { href: '/crm/products', label: 'Товары', icon: Tag },
-  { href: '/crm/customers', label: 'Клиенты', icon: Users },
-  { href: '/crm/tours', label: 'Туры', icon: Waves },
-  { href: '/crm/chat', label: 'Чат', icon: MessageSquare },
-  { href: '/crm/users', label: 'Пользователи', icon: User },
-  { href: '/crm/settings', label: 'Настройки', icon: Settings },
+  { href: '/', label: 'Дашборд', icon: LayoutDashboard, exact: true },
+  { href: '/orders', label: 'Заказы', icon: ShoppingBag },
+  { href: '/inventory', label: 'Инвентарь', icon: Package },
+  { href: '/products', label: 'Товары', icon: Tag },
+  { href: '/customers', label: 'Клиенты', icon: Users },
+  { href: '/tours', label: 'Туры', icon: Waves },
+  { href: '/chat', label: 'Чат', icon: MessageSquare },
+  { href: '/users', label: 'Пользователи', icon: User },
+  { href: '/settings', label: 'Настройки', icon: Settings },
 ];
 
 function NavItem({ item }: { item: typeof NAV_ITEMS[0] }) {
@@ -47,16 +46,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Overlay for mobile */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/40 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* Sidebar */}
       <aside className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 flex flex-col transition-transform lg:translate-x-0 ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
-        {/* Logo */}
         <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-100">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
             <span className="text-white text-lg">🛶</span>
@@ -70,12 +66,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </button>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
           {NAV_ITEMS.map(item => <NavItem key={item.href} item={item} />)}
         </nav>
 
-        {/* User */}
         <div className="px-4 py-4 border-t border-gray-100">
           <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-50 mb-2">
             <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
@@ -94,9 +88,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Header */}
         <header className="bg-white border-b border-gray-200 px-4 sm:px-6 h-14 flex items-center gap-4">
           <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-1 text-gray-500 hover:text-gray-700">
             <Menu className="w-5 h-5" />
@@ -110,7 +102,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </header>
 
-        {/* Content */}
         <main className="flex-1 overflow-auto p-4 sm:p-6">
           {children}
         </main>

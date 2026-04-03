@@ -26,7 +26,8 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !user) navigate('/login');
-  }, [user, loading, navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, loading]);
 
   if (loading) return (
     <div className="flex items-center justify-center h-screen bg-gray-50">

@@ -3,6 +3,8 @@ import { Reflector } from "@nestjs/core";
 import { ROLES_KEY } from "../decorators/roles.decorator.js";
 import type { UserRole } from "@workspace/db";
 
+const SUPER_ADMIN_ROLES = ["super_admin", "superadmin"];
+
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
@@ -23,12 +25,13 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException("Доступ запрещён");
     }
 
-    const hasRole = requiredRoles.some((role) => {
-      if (role === "admin") {
-        return ["superadmin", "admin"].includes(user.role);
-      }
-      return user.role === role || user.role === "superadmin";
-    });
+    const isSuperAdmin = SUPER_ADMIN_ROLES.includes(user.role);
+
+    if (isSuperAdmin) {
+      return true;
+    }
+
+    const hasRole = requiredRoles.some((role) => user.role === role);
 
     if (!hasRole) {
       throw new ForbiddenException("Недостаточно прав");
