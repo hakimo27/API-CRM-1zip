@@ -3,20 +3,40 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Kayak rental platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: catalog
+    description: Product catalog
+  - name: categories
+    description: Product categories
+  - name: availability
+    description: Availability checks
+  - name: pricing
+    description: Price calculation
+  - name: orders
+    description: Order management
+  - name: customers
+    description: Customer management
+  - name: inventory
+    description: Inventory management
+  - name: chat
+    description: Chat sessions and messages
+  - name: admin
+    description: Admin operations
+  - name: forms
+    description: Feedback forms
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +44,612 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /catalog:
+    get:
+      operationId: listProducts
+      tags: [catalog]
+      summary: List all active products
+      parameters:
+        - in: query
+          name: category
+          schema:
+            type: string
+        - in: query
+          name: capacity
+          schema:
+            type: string
+        - in: query
+          name: construction_type
+          schema:
+            type: string
+        - in: query
+          name: featured
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /catalog/{slug}:
+    get:
+      operationId: getProduct
+      tags: [catalog]
+      summary: Get product by slug
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [categories]
+      summary: List all categories
+      responses:
+        "200":
+          description: Category list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+
+  /availability/check:
+    post:
+      operationId: checkAvailability
+      tags: [availability]
+      summary: Check product availability for date range
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AvailabilityRequest"
+      responses:
+        "200":
+          description: Availability result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailabilityResult"
+
+  /pricing/calculate:
+    post:
+      operationId: calculatePrice
+      tags: [pricing]
+      summary: Calculate rental price
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PricingRequest"
+      responses:
+        "200":
+          description: Price calculation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricingResult"
+
+  /orders:
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Create a new order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderConfirmation"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      tags: [orders]
+      summary: Get order by ID (public, for confirmation page)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderConfirmation"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /chat/session:
+    post:
+      operationId: createChatSession
+      tags: [chat]
+      summary: Create a chat session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChatSessionRequest"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatSession"
+
+  /chat/session/{sessionId}/messages:
+    get:
+      operationId: getChatMessages
+      tags: [chat]
+      summary: Get messages for a session
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: since
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Messages list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+    post:
+      operationId: sendChatMessage
+      tags: [chat]
+      summary: Send a message in a session
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+
+  /admin/orders:
+    get:
+      operationId: adminListOrders
+      tags: [admin]
+      summary: Admin — list orders
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: date_from
+          schema:
+            type: ["string", "null"]
+        - in: query
+          name: date_to
+          schema:
+            type: ["string", "null"]
+        - in: query
+          name: search
+          schema:
+            type: ["string", "null"]
+        - in: query
+          name: page
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Orders list with pagination
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOrdersResponse"
+
+  /admin/orders/{id}:
+    get:
+      operationId: adminGetOrder
+      tags: [admin]
+      summary: Admin — get order detail
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOrderDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/orders/{id}/status:
+    patch:
+      operationId: adminUpdateOrderStatus
+      tags: [admin]
+      summary: Admin — update order status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrderStatusRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOrderDetail"
+
+  /admin/inventory:
+    get:
+      operationId: adminListInventory
+      tags: [admin]
+      summary: Admin — list inventory units
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: ["string", "null"]
+        - in: query
+          name: product_id
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Inventory list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InventoryUnit"
+
+  /admin/inventory/{id}:
+    patch:
+      operationId: adminUpdateInventory
+      tags: [admin]
+      summary: Admin — update inventory unit status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateInventoryRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryUnit"
+
+  /admin/customers:
+    get:
+      operationId: adminListCustomers
+      tags: [admin]
+      summary: Admin — list customers
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: ["string", "null"]
+        - in: query
+          name: page
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Customers list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminCustomersResponse"
+
+  /admin/customers/{id}:
+    get:
+      operationId: adminGetCustomer
+      tags: [admin]
+      summary: Admin — get customer detail
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Customer with order history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminCustomerDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/dashboard:
+    get:
+      operationId: adminGetDashboard
+      tags: [admin]
+      summary: Admin — dashboard stats
+      responses:
+        "200":
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /admin/chat-sessions:
+    get:
+      operationId: adminListChatSessions
+      tags: [admin]
+      summary: Admin — list chat sessions
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Chat sessions list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminChatSession"
+
+  /admin/chat-sessions/{id}/reply:
+    post:
+      operationId: adminReplyChatSession
+      tags: [admin]
+      summary: Admin — send reply in chat session
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "201":
+          description: Reply sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+
+  /admin/products:
+    get:
+      operationId: adminListProducts
+      tags: [admin]
+      summary: Admin — list all products (including inactive)
+      responses:
+        "200":
+          description: All products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminProduct"
+    post:
+      operationId: adminCreateProduct
+      tags: [admin]
+      summary: Admin — create product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminProductInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminProduct"
+
+  /admin/products/{id}:
+    patch:
+      operationId: adminUpdateProduct
+      tags: [admin]
+      summary: Admin — update product
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminProductInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminProduct"
+
+  /admin/reports/overview:
+    get:
+      operationId: adminGetReportsOverview
+      tags: [admin]
+      summary: Admin — get reports overview
+      parameters:
+        - in: query
+          name: date_from
+          schema:
+            type: ["string", "null"]
+        - in: query
+          name: date_to
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Reports overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportsOverview"
+
+  /integrations/telegram/webhook:
+    post:
+      operationId: telegramWebhook
+      tags: [admin]
+      summary: Telegram webhook endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                update_id:
+                  type: integer
+              additionalProperties: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /forms/cheaper-price:
+    post:
+      operationId: submitCheaperPrice
+      tags: [forms]
+      summary: Submit "found it cheaper" form
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheaperPriceFormInput"
+      responses:
+        "201":
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /forms/feedback:
+    post:
+      operationId: submitFeedback
+      tags: [forms]
+      summary: Submit feedback form
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackFormInput"
+      responses:
+        "201":
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +660,962 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: ["string", "null"]
+        h1:
+          type: ["string", "null"]
+        metaTitle:
+          type: ["string", "null"]
+        metaDescription:
+          type: ["string", "null"]
+        productCount:
+          type: integer
+      required:
+        - id
+        - name
+        - slug
+        - productCount
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        sku:
+          type: ["string", "null"]
+        categoryId:
+          type: integer
+        categoryName:
+          type: string
+        shortDescription:
+          type: ["string", "null"]
+        capacity:
+          type: ["integer", "null"]
+        constructionType:
+          type: ["string", "null"]
+        weight:
+          type: ["string", "null"]
+        dimensions:
+          type: ["string", "null"]
+        depositAmount:
+          type: ["number", "null"]
+        featured:
+          type: boolean
+        badge:
+          type: ["string", "null"]
+        mainImage:
+          type: ["string", "null"]
+        tariffs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tariff"
+      required:
+        - id
+        - name
+        - slug
+        - categoryId
+        - categoryName
+        - featured
+
+    ProductDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        sku:
+          type: ["string", "null"]
+        categoryId:
+          type: integer
+        categoryName:
+          type: string
+        shortDescription:
+          type: ["string", "null"]
+        fullDescription:
+          type: ["string", "null"]
+        capacity:
+          type: ["integer", "null"]
+        constructionType:
+          type: ["string", "null"]
+        weight:
+          type: ["string", "null"]
+        dimensions:
+          type: ["string", "null"]
+        kit:
+          type: ["string", "null"]
+        depositAmount:
+          type: ["number", "null"]
+        featured:
+          type: boolean
+        badge:
+          type: ["string", "null"]
+        metaTitle:
+          type: ["string", "null"]
+        metaDescription:
+          type: ["string", "null"]
+        h1:
+          type: ["string", "null"]
+        ogTitle:
+          type: ["string", "null"]
+        ogDescription:
+          type: ["string", "null"]
+        canonicalUrl:
+          type: ["string", "null"]
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductImage"
+        tariffs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tariff"
+        specifications:
+          type: object
+          additionalProperties: true
+      required:
+        - id
+        - name
+        - slug
+        - categoryId
+        - categoryName
+        - featured
+        - images
+        - tariffs
+
+    ProductImage:
+      type: object
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        alt:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
+      required:
+        - id
+        - url
+        - sortOrder
+
+    Tariff:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [weekend, week, weekday, may_holidays]
+        label:
+          type: string
+        pricePerDay:
+          type: number
+        minDays:
+          type: ["integer", "null"]
+        description:
+          type: ["string", "null"]
+      required:
+        - id
+        - type
+        - label
+        - pricePerDay
+
+    AvailabilityRequest:
+      type: object
+      properties:
+        productId:
+          type: integer
+        startDate:
+          type: string
+        endDate:
+          type: string
+        quantity:
+          type: integer
+      required:
+        - productId
+        - startDate
+        - endDate
+        - quantity
+
+    AvailabilityResult:
+      type: object
+      properties:
+        available:
+          type: boolean
+        availableQuantity:
+          type: integer
+        requestedQuantity:
+          type: integer
+        blockedDates:
+          type: array
+          items:
+            type: string
+        message:
+          type: ["string", "null"]
+      required:
+        - available
+        - availableQuantity
+        - requestedQuantity
+        - blockedDates
+
+    PricingRequest:
+      type: object
+      properties:
+        productId:
+          type: integer
+        startDate:
+          type: string
+        endDate:
+          type: string
+        quantity:
+          type: integer
+      required:
+        - productId
+        - startDate
+        - endDate
+        - quantity
+
+    PricingResult:
+      type: object
+      properties:
+        exactPrice:
+          type: ["number", "null"]
+        approximatePrice:
+          type: ["number", "null"]
+        managerReviewRequired:
+          type: boolean
+        pricingComment:
+          type: ["string", "null"]
+        tariffUsed:
+          type: ["string", "null"]
+        days:
+          type: integer
+        pricePerDay:
+          type: ["number", "null"]
+        depositAmount:
+          type: ["number", "null"]
+      required:
+        - managerReviewRequired
+        - days
+
+    CreateOrderRequest:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItemInput"
+        startDate:
+          type: string
+        endDate:
+          type: string
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+        customerEmail:
+          type: ["string", "null"]
+        communicationChannel:
+          type: string
+          enum: [telegram, whatsapp, phone, email]
+        deliveryType:
+          type: string
+          enum: [pickup, delivery]
+        deliveryAddress:
+          type: ["string", "null"]
+        comment:
+          type: ["string", "null"]
+        privacyAccepted:
+          type: boolean
+      required:
+        - items
+        - startDate
+        - endDate
+        - customerName
+        - customerPhone
+        - communicationChannel
+        - deliveryType
+        - privacyAccepted
+
+    OrderItemInput:
+      type: object
+      properties:
+        productId:
+          type: integer
+        quantity:
+          type: integer
+        lifejacketSizes:
+          type: ["string", "null"]
+      required:
+        - productId
+        - quantity
+
+    OrderConfirmation:
+      type: object
+      properties:
+        id:
+          type: integer
+        orderNumber:
+          type: string
+        status:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+        deliveryType:
+          type: string
+        deliveryAddress:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItemConfirmation"
+        exactPrice:
+          type: ["number", "null"]
+        approximatePrice:
+          type: ["number", "null"]
+        managerReviewRequired:
+          type: boolean
+        pricingComment:
+          type: ["string", "null"]
+        totalDeposit:
+          type: ["number", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - orderNumber
+        - status
+        - startDate
+        - endDate
+        - customerName
+        - customerPhone
+        - deliveryType
+        - items
+        - managerReviewRequired
+        - createdAt
+
+    OrderItemConfirmation:
+      type: object
+      properties:
+        productId:
+          type: integer
+        productName:
+          type: string
+        quantity:
+          type: integer
+        depositAmount:
+          type: ["number", "null"]
+      required:
+        - productId
+        - productName
+        - quantity
+
+    AdminOrdersResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminOrder"
+        total:
+          type: integer
+        page:
+          type: integer
+        perPage:
+          type: integer
+      required:
+        - data
+        - total
+        - page
+        - perPage
+
+    AdminOrder:
+      type: object
+      properties:
+        id:
+          type: integer
+        orderNumber:
+          type: string
+        status:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+        deliveryType:
+          type: string
+        exactPrice:
+          type: ["number", "null"]
+        approximatePrice:
+          type: ["number", "null"]
+        managerReviewRequired:
+          type: boolean
+        createdAt:
+          type: string
+        itemCount:
+          type: integer
+      required:
+        - id
+        - orderNumber
+        - status
+        - startDate
+        - endDate
+        - customerName
+        - customerPhone
+        - deliveryType
+        - managerReviewRequired
+        - createdAt
+        - itemCount
+
+    AdminOrderDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        orderNumber:
+          type: string
+        status:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+        customerEmail:
+          type: ["string", "null"]
+        communicationChannel:
+          type: string
+        deliveryType:
+          type: string
+        deliveryAddress:
+          type: ["string", "null"]
+        comment:
+          type: ["string", "null"]
+        exactPrice:
+          type: ["number", "null"]
+        approximatePrice:
+          type: ["number", "null"]
+        managerReviewRequired:
+          type: boolean
+        pricingComment:
+          type: ["string", "null"]
+        totalDeposit:
+          type: ["number", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminOrderItem"
+        statusHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderStatusHistory"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - orderNumber
+        - status
+        - startDate
+        - endDate
+        - customerName
+        - customerPhone
+        - communicationChannel
+        - deliveryType
+        - managerReviewRequired
+        - items
+        - statusHistory
+        - createdAt
+        - updatedAt
+
+    AdminOrderItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        productId:
+          type: integer
+        productName:
+          type: string
+        quantity:
+          type: integer
+        lifejacketSizes:
+          type: ["string", "null"]
+        depositAmount:
+          type: ["number", "null"]
+      required:
+        - id
+        - productId
+        - productName
+        - quantity
+
+    OrderStatusHistory:
+      type: object
+      properties:
+        status:
+          type: string
+        comment:
+          type: ["string", "null"]
+        changedAt:
+          type: string
+      required:
+        - status
+        - changedAt
+
+    UpdateOrderStatusRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [new, confirmed, paid, assembled, issued, delivered, completed, cancelled]
+        comment:
+          type: ["string", "null"]
+      required:
+        - status
+
+    InventoryUnit:
+      type: object
+      properties:
+        id:
+          type: integer
+        productId:
+          type: integer
+        productName:
+          type: string
+        serialNumber:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [available, busy, reserved, checked, ready_for_issue, in_repair, incomplete, incoming, written_off]
+        condition:
+          type: ["string", "null"]
+        warehouseLocation:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - productId
+        - productName
+        - status
+        - createdAt
+
+    UpdateInventoryRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [available, busy, reserved, checked, ready_for_issue, in_repair, incomplete, incoming, written_off]
+        condition:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        warehouseLocation:
+          type: ["string", "null"]
+      required:
+        - status
+
+    AdminCustomersResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminCustomer"
+        total:
+          type: integer
+        page:
+          type: integer
+        perPage:
+          type: integer
+      required:
+        - data
+        - total
+        - page
+        - perPage
+
+    AdminCustomer:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: ["string", "null"]
+        communicationChannel:
+          type: ["string", "null"]
+        orderCount:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - phone
+        - orderCount
+        - createdAt
+
+    AdminCustomerDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: ["string", "null"]
+        communicationChannel:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminOrder"
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - phone
+        - orders
+        - createdAt
+
+    DashboardStats:
+      type: object
+      properties:
+        newOrders:
+          type: integer
+        todayOrders:
+          type: integer
+        todayAssemblies:
+          type: integer
+        pendingReview:
+          type: integer
+        totalRevenue:
+          type: number
+        activeRentals:
+          type: integer
+        recentOrders:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminOrder"
+        statusBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatusCount"
+      required:
+        - newOrders
+        - todayOrders
+        - todayAssemblies
+        - pendingReview
+        - totalRevenue
+        - activeRentals
+        - recentOrders
+        - statusBreakdown
+
+    StatusCount:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          type: integer
+      required:
+        - status
+        - count
+
+    ChatSession:
+      type: object
+      properties:
+        id:
+          type: integer
+        sessionToken:
+          type: string
+        status:
+          type: string
+        customerId:
+          type: ["integer", "null"]
+        orderId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - sessionToken
+        - status
+        - createdAt
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        sessionId:
+          type: integer
+        sender:
+          type: string
+          enum: [customer, manager, bot]
+        content:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - sessionId
+        - sender
+        - content
+        - createdAt
+
+    AdminChatSession:
+      type: object
+      properties:
+        id:
+          type: integer
+        sessionToken:
+          type: string
+        status:
+          type: string
+        customerName:
+          type: ["string", "null"]
+        lastMessage:
+          type: ["string", "null"]
+        unreadCount:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - sessionToken
+        - status
+        - unreadCount
+        - createdAt
+
+    CreateChatSessionRequest:
+      type: object
+      properties:
+        customerName:
+          type: ["string", "null"]
+        orderId:
+          type: ["integer", "null"]
+      required: []
+
+    SendMessageRequest:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
+
+    AdminProduct:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        sku:
+          type: ["string", "null"]
+        categoryId:
+          type: integer
+        categoryName:
+          type: string
+        active:
+          type: boolean
+        featured:
+          type: boolean
+        depositAmount:
+          type: ["number", "null"]
+        capacity:
+          type: ["integer", "null"]
+        constructionType:
+          type: ["string", "null"]
+        badge:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - slug
+        - categoryId
+        - categoryName
+        - active
+        - featured
+        - createdAt
+
+    AdminProductInput:
+      type: object
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        sku:
+          type: ["string", "null"]
+        categoryId:
+          type: integer
+        shortDescription:
+          type: ["string", "null"]
+        fullDescription:
+          type: ["string", "null"]
+        active:
+          type: boolean
+        featured:
+          type: boolean
+        depositAmount:
+          type: ["number", "null"]
+        capacity:
+          type: ["integer", "null"]
+        constructionType:
+          type: ["string", "null"]
+        weight:
+          type: ["string", "null"]
+        dimensions:
+          type: ["string", "null"]
+        kit:
+          type: ["string", "null"]
+        badge:
+          type: ["string", "null"]
+        metaTitle:
+          type: ["string", "null"]
+        metaDescription:
+          type: ["string", "null"]
+        h1:
+          type: ["string", "null"]
+      required:
+        - name
+        - slug
+        - categoryId
+        - active
+        - featured
+
+    ReportsOverview:
+      type: object
+      properties:
+        totalOrders:
+          type: integer
+        completedOrders:
+          type: integer
+        cancelledOrders:
+          type: integer
+        totalRevenue:
+          type: number
+        inRepairCount:
+          type: integer
+        utilizationRate:
+          type: number
+        ordersByStatus:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatusCount"
+        revenueByMonth:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthRevenue"
+      required:
+        - totalOrders
+        - completedOrders
+        - cancelledOrders
+        - totalRevenue
+        - inRepairCount
+        - utilizationRate
+        - ordersByStatus
+        - revenueByMonth
+
+    MonthRevenue:
+      type: object
+      properties:
+        month:
+          type: string
+        revenue:
+          type: number
+        orderCount:
+          type: integer
+      required:
+        - month
+        - revenue
+        - orderCount
+
+    CheaperPriceFormInput:
+      type: object
+      properties:
+        productId:
+          type: ["integer", "null"]
+        name:
+          type: string
+        contact:
+          type: string
+        competitorUrl:
+          type: ["string", "null"]
+        competitorPrice:
+          type: ["number", "null"]
+        comment:
+          type: ["string", "null"]
+      required:
+        - name
+        - contact
+
+    FeedbackFormInput:
+      type: object
+      properties:
+        name:
+          type: string
+        contact:
+          type: string
+        message:
+          type: string
+        pageUrl:
+          type: ["string", "null"]
+      required:
+        - name
+        - contact
+        - message
