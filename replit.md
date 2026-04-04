@@ -30,6 +30,21 @@ lib/
 
 Auth, Users, Branches, Categories, Products, Pricing, Availability, Orders, Inventory, Chat (WebSocket), Telegram, Settings, Tours, Content, Customers, Sales, Notifications, Media (+ Health)
 
+## CRM Navigation Structure
+
+```
+Операции: Dashboard | Заказы аренды (/orders) | Заказы продажи (/sale-orders) | Бронирования туров (/tour-bookings) | Чат | Логи
+Каталог: Товары аренды (/products) | Товары продажи (/sale-products) | Категории | Инвентарь | Медиафайлы
+Туры: Туры | Реки (/content/rivers)
+Клиенты: Клиенты | Филиалы
+Контент: Статьи | Страницы | FAQ | Отзывы
+Система: Пользователи | Настройки
+```
+
+- Manual rental order creation: `/orders/new` → `CreateRentalOrderPage.tsx`
+- Manual sale order creation: `/sale-orders/new` → `CreateSaleOrderPage.tsx`
+- Order extension: `PATCH /api/orders/:id/extend` with amber modal in OrdersPage
+
 ## Key API Routes
 
 ```
@@ -39,15 +54,20 @@ GET  /api/auth/me              → User
 GET  /api/products             → Product[] (query: featured, categorySlug, search, limit)
 GET  /api/products/:slug       → ProductDetail (with tariffs)
 GET  /api/categories           → Category[]
-POST /api/orders               → Order
+POST /api/orders               → Order (supports: customerName, phone, email, startDate, endDate, items, deliveryType, deliveryAddress, managerComment, customerComment, totalAmount)
 GET  /api/orders/my            → Order[] (auth required)
 GET  /api/orders/:number       → Order
+PATCH /api/orders/:id/extend   → { endDate } — extend rental period
 PATCH /api/orders/:id/status   → (admin)
 GET  /api/inventory            → InventoryUnit[]
 PATCH /api/inventory/:id       → (admin)
 GET  /api/customers            → Customer[] (admin)
 GET  /api/users                → User[] (admin)
 GET  /api/tours                → Tour[]
+GET  /api/tours/bookings       → TourBooking[] (admin)
+GET  /api/sales/orders         → SaleOrder[] (admin)
+POST /api/sales/orders         → SaleOrder (customerName, phone, items, deliveryType)
+GET  /api/availability/product → single product availability check
 GET  /api/settings             → Setting[]
 PATCH /api/settings/:key       → (admin)
 GET  /api/content/reviews/admin → Review[] (all, admin)

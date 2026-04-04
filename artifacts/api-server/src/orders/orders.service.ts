@@ -33,15 +33,18 @@ export interface CreateOrderItemDto {
 
 export interface CreateOrderDto {
   customerName: string;
-  customerPhone: string;
+  customerPhone?: string;
   customerEmail?: string;
   communicationChannel?: string;
   startDate?: string;
   endDate?: string;
   items: CreateOrderItemDto[];
   notes?: string;
+  managerComment?: string;
+  customerComment?: string;
   depositPaid?: boolean;
   branchId?: number;
+  pickupPointId?: number;
   deliveryType?: string;
   deliveryAddress?: string;
   promoCode?: string;
@@ -256,8 +259,11 @@ export class OrdersService {
       customerId,
       status: "new",
       totalAmount: String(finalTotalAmount),
-      notes: dto.notes,
+      notes: dto.notes || dto.managerComment || undefined,
+      comment: dto.customerComment || undefined,
       depositPaid: dto.depositPaid ?? false,
+      deliveryType: dto.deliveryType || "pickup",
+      deliveryAddress: dto.deliveryAddress || undefined,
     };
 
     if (startDate) orderValues.startDate = startDate;

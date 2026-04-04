@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Link } from 'wouter';
-import { Search, RefreshCw, ChevronRight, CalendarPlus, X } from 'lucide-react';
+import { Link, useLocation } from 'wouter';
+import { Search, RefreshCw, ChevronRight, CalendarPlus, X, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const STATUSES = [
@@ -53,6 +53,7 @@ export default function OrdersPage() {
   const [extendDate, setExtendDate] = useState('');
   const qc = useQueryClient();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const { data: orders = [], isLoading, refetch } = useQuery<any[]>({
     queryKey: ['orders', statusFilter],
@@ -104,6 +105,11 @@ export default function OrdersPage() {
             className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 text-sm transition-colors">
             <RefreshCw className="w-4 h-4" />
             Обновить
+          </button>
+          <button onClick={() => navigate('/orders/new')}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-sm font-medium transition-colors">
+            <Plus className="w-4 h-4" />
+            Создать заказ
           </button>
         </div>
 

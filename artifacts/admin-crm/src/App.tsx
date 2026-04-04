@@ -7,6 +7,10 @@ import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
 import OrdersPage from '@/pages/OrdersPage';
 import OrderDetailPage from '@/pages/OrderDetailPage';
+import CreateRentalOrderPage from '@/pages/CreateRentalOrderPage';
+import SaleOrdersPage from '@/pages/SaleOrdersPage';
+import CreateSaleOrderPage from '@/pages/CreateSaleOrderPage';
+import TourBookingsPage from '@/pages/TourBookingsPage';
 import InventoryPage from '@/pages/InventoryPage';
 import ProductsPage from '@/pages/ProductsPage';
 import CustomersPage from '@/pages/CustomersPage';
@@ -54,23 +58,43 @@ function CrmRoutes() {
     <Switch>
       <Route path="/login" component={LoginPage} />
       <Route path="/"><G><DashboardPage /></G></Route>
-      <Route path="/orders"><G><OrdersPage /></G></Route>
+
+      {/* Rental Orders */}
+      <Route path="/orders/new"><G><CreateRentalOrderPage /></G></Route>
       <Route path="/orders/:id">{(p) => <G><OrderDetailPage id={p.id} /></G>}</Route>
-      <Route path="/inventory"><G><InventoryPage /></G></Route>
+      <Route path="/orders"><G><OrdersPage /></G></Route>
+
+      {/* Sale Orders */}
+      <Route path="/sale-orders/new"><G><CreateSaleOrderPage /></G></Route>
+      <Route path="/sale-orders"><G><SaleOrdersPage /></G></Route>
+
+      {/* Tour Bookings */}
+      <Route path="/tour-bookings"><G><TourBookingsPage /></G></Route>
+
+      {/* Catalog */}
       <Route path="/products"><G><ProductsPage /></G></Route>
       <Route path="/sale-products"><G><SaleProductsPage /></G></Route>
       <Route path="/categories"><G><CategoriesPage /></G></Route>
-      <Route path="/customers"><G><CustomersPage /></G></Route>
+      <Route path="/inventory"><G><InventoryPage /></G></Route>
+      <Route path="/media"><G><MediaPage /></G></Route>
+
+      {/* Tours */}
       <Route path="/tours"><G><ToursPage /></G></Route>
+
+      {/* Customers */}
+      <Route path="/customers"><G><CustomersPage /></G></Route>
       <Route path="/branches"><G><BranchesPage /></G></Route>
-      <Route path="/chat"><G><ChatPage /></G></Route>
-      <Route path="/users"><G><UsersPage /></G></Route>
+
+      {/* Content */}
       <Route path="/content/:tab">{(p) => <G><ContentPage tab={p.tab} /></G>}</Route>
       <Route path="/content"><G><ContentPage tab="articles" /></G></Route>
-      <Route path="/templates"><G><ContentPage tab="templates" /></G></Route>
+
+      {/* System */}
+      <Route path="/chat"><G><ChatPage /></G></Route>
+      <Route path="/users"><G><UsersPage /></G></Route>
       <Route path="/settings"><G><SettingsPage /></G></Route>
       <Route path="/logs"><G><LogsPage /></G></Route>
-      <Route path="/media"><G><MediaPage /></G></Route>
+
       <Route><G><NotFoundPage /></G></Route>
     </Switch>
   );

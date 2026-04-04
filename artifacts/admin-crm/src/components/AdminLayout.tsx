@@ -3,51 +3,45 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   LayoutDashboard, ShoppingBag, Package, Users, Tag, MapPin,
   MessageSquare, Settings, LogOut, Menu, X, User, Waves, ChevronRight,
-  Store, FileText, HelpCircle, Star, Bell, GitBranch, Truck,
-  Activity, Building2, BookOpen, ScrollText, Image,
+  Store, FileText, HelpCircle, Star, Bell, Activity, Building2,
+  BookOpen, ScrollText, Image, ShoppingCart, CalendarCheck, Fish,
 } from 'lucide-react';
 import { useState } from 'react';
 
 const NAV_GROUPS = [
   {
-    label: 'Главное',
+    label: 'Операции',
     items: [
       { href: '/', label: 'Дашборд', icon: LayoutDashboard, exact: true },
-    ],
-  },
-  {
-    label: 'Продажи',
-    items: [
       { href: '/orders', label: 'Заказы аренды', icon: ShoppingBag },
-      { href: '/sale-products', label: 'Товары продажи', icon: Store },
+      { href: '/sale-orders', label: 'Заказы продажи', icon: ShoppingCart },
+      { href: '/tour-bookings', label: 'Бронирования туров', icon: CalendarCheck },
+      { href: '/chat', label: 'Чат', icon: MessageSquare },
+      { href: '/logs', label: 'Логи', icon: Activity },
     ],
   },
   {
     label: 'Каталог',
     items: [
       { href: '/products', label: 'Товары аренды', icon: Tag },
-      { href: '/categories', label: 'Категории', icon: GitBranch },
-      { href: '/tours', label: 'Туры', icon: Waves },
+      { href: '/sale-products', label: 'Товары продажи', icon: Store },
+      { href: '/categories', label: 'Категории', icon: ScrollText },
+      { href: '/inventory', label: 'Инвентарь', icon: Package },
+      { href: '/media', label: 'Медиафайлы', icon: Image },
     ],
   },
   {
-    label: 'Операции',
+    label: 'Туры',
     items: [
-      { href: '/inventory', label: 'Инвентарь', icon: Package },
-      { href: '/branches', label: 'Филиалы', icon: Building2 },
+      { href: '/tours', label: 'Туры', icon: Waves },
+      { href: '/content/rivers', label: 'Реки', icon: Fish },
     ],
   },
   {
     label: 'Клиенты',
     items: [
       { href: '/customers', label: 'Клиенты', icon: Users },
-      { href: '/chat', label: 'Чат', icon: MessageSquare },
-    ],
-  },
-  {
-    label: 'Команда',
-    items: [
-      { href: '/users', label: 'Пользователи', icon: User },
+      { href: '/branches', label: 'Филиалы', icon: Building2 },
     ],
   },
   {
@@ -57,15 +51,13 @@ const NAV_GROUPS = [
       { href: '/content/pages', label: 'Страницы', icon: FileText },
       { href: '/content/faq', label: 'FAQ', icon: HelpCircle },
       { href: '/content/reviews', label: 'Отзывы', icon: Star },
-      { href: '/templates', label: 'Шаблоны', icon: ScrollText },
-      { href: '/media', label: 'Медиафайлы', icon: Image },
     ],
   },
   {
     label: 'Система',
     items: [
+      { href: '/users', label: 'Пользователи', icon: User },
       { href: '/settings', label: 'Настройки', icon: Settings },
-      { href: '/logs', label: 'Логи', icon: Activity },
     ],
   },
 ];
