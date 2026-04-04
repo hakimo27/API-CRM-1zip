@@ -28,7 +28,7 @@ lib/
 
 ## API Modules (NestJS)
 
-Auth, Users, Branches, Categories, Products, Pricing, Availability, Orders, Inventory, Chat (WebSocket), Telegram, Settings, Tours, Content, Customers, Sales, Notifications, (+ Health)
+Auth, Users, Branches, Categories, Products, Pricing, Availability, Orders, Inventory, Chat (WebSocket), Telegram, Settings, Tours, Content, Customers, Sales, Notifications, Media (+ Health)
 
 ## Key API Routes
 
@@ -50,11 +50,23 @@ GET  /api/users                → User[] (admin)
 GET  /api/tours                → Tour[]
 GET  /api/settings             → Setting[]
 PATCH /api/settings/:key       → (admin)
-GET  /api/content/reviews      → Review[]
-GET  /api/content/pages/:slug  → Page
+GET  /api/content/reviews/admin → Review[] (all, admin)
+GET  /api/content/reviews      → Review[] (approved only)
+PATCH /api/content/reviews/:id → Update review
+PATCH /api/content/reviews/:id/approve → Approve review
+GET  /api/content/pages/admin  → Page[] (all, admin)
+GET  /api/content/pages/:slug  → Page (public)
+POST /api/content/pages        → Create page (admin)
+PATCH /api/content/pages/:id   → Update page (admin)
 GET  /api/chat/sessions        → ChatSession[] (admin)
 GET  /api/chat/sessions/:id/messages → Message[]
 POST /api/chat/sessions/:id/messages → Message
+GET  /api/media/files          → MediaFile[] (admin)
+GET  /api/media/folders        → string[] (folder names)
+POST /api/media/upload         → Upload file (multipart)
+DELETE /api/media/files        → Delete file (?path=...)
+POST /api/media/folders        → Create folder
+DELETE /api/sales/products/:id → Delete sale product
 ```
 
 ## Public Site Routes (/)
@@ -73,28 +85,38 @@ POST /api/chat/sessions/:id/messages → Message
 
 ## Admin CRM Routes (/crm)
 
-- `/crm/login` — CRM login (redirects from any unauthenticated page)
-- `/crm` — Dashboard: stats, recent orders, quick links
-- `/crm/orders` — Orders list with status filter, search
-- `/crm/orders/:id` — Order detail + status management
-- `/crm/inventory` — Inventory management with status updates
-- `/crm/products` — Product catalog management
-- `/crm/customers` — Customer list
-- `/crm/tours` — Tours management
-- `/crm/chat` — Real-time chat with customers (5s polling)
-- `/crm/users` — User management with roles
-- `/crm/settings` — System settings editor
+Sidebar has 8 grouped sections:
+
+**Главное:** Dashboard (stats, charts, recent activity)
+
+**Продажи:** Orders (list + detail), Sale Products (товары из магазина)
+
+**Каталог:** Products (kayaks/equipment), Categories, Branches
+
+**Операции:** Inventory (unit tracking + status)
+
+**Клиенты:** Customers, Tours (3 tabs: tours/dates/bookings)
+
+**Команда:** Users (full CRUD + reset-password + toggle-active)
+
+**Контент:** Articles, Pages, FAQ, Reviews, Templates (email/sms), Media (file manager with upload/preview/delete)
+
+**Система:** Settings, Logs (notifications/telegram/chat/errors)
 
 ## Important Implementation Notes
 
 - **DB injection**: `@Inject(DB_TOKEN)` where `DB_TOKEN = "DRIZZLE_DB"`
-- **Build externals**: `@nestjs/microservices`, `@nestjs/websockets/socket-module`, `cache-manager`, `class-transformer/storage`
+- **Build externals**: `@nestjs/microservices`, `@nestjs/websockets/socket-module`, `cache-manager`, `class-transformer/storage`, `multer`
 - **All UI text in Russian**
 - **Order number format**: `KR-YYMMDD-XXXX`
 - **JWT storage**: `access_token` / `refresh_token` in localStorage (public site), `crm_token` (admin)
-- **Auth roles**: super_admin, admin, manager, operator, warehouse, guide, client
+- **Auth roles**: superadmin, admin, manager, warehouse, instructor, content_manager, customer
 - **Cart**: stored in `kayak_cart` localStorage key
 - **Prices**: numeric type in DB → always parse with `Number()`
+- **Redis**: configured in docker-compose as `redis:7-alpine` (256mb LRU, redis_data volume). Env vars: `REDIS_URL`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `CACHE_TTL_DEFAULT=300`
+- **Media uploads**: local storage at `UPLOADS_DIR` (default: `./uploads`), public via `PUBLIC_UPLOADS_URL`. Max 50MB per file. In docker: `/app/uploads` volume.
+- **Static routes before param routes**: NestJS route ordering — always define `GET /resource/admin` BEFORE `GET /resource/:slug` or it will be captured as a slug
+- **Tour dates filter**: gte with Date objects causes "Invalid time value" errors — filter JS-side instead
 
 ## Test Credentials
 

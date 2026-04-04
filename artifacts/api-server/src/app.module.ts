@@ -19,6 +19,7 @@ import { ContentModule } from "./content/content.module.js";
 import { NotificationsModule } from "./notifications/notifications.module.js";
 import { CustomersModule } from "./customers/customers.module.js";
 import { SalesModule } from "./sales/sales.module.js";
+import { MediaModule } from "./media/media.module.js";
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { SalesModule } from "./sales/sales.module.js";
     NotificationsModule,
     CustomersModule,
     SalesModule,
+    MediaModule,
   ],
 })
 export class AppModule {}

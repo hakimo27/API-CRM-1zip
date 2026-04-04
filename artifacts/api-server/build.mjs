@@ -65,6 +65,7 @@ async function buildAll() {
     keepNames: true,
     external: [
       "*.node",
+      "multer",
       "sharp",
       "better-sqlite3",
       "sqlite3",

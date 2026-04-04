@@ -1,12 +1,15 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Delete,
   Body,
   Param,
   ParseIntPipe,
   Query,
+  HttpCode,
+  HttpStatus,
 } from "@nestjs/common";
 import { UsersService } from "./users.service.js";
 import { CurrentUser } from "../common/decorators/current-user.decorator.js";
@@ -17,7 +20,7 @@ export class UsersController {
   constructor(private usersService: UsersService) {}
 
   @Get()
-  @Roles("admin", "manager")
+  @Roles("admin", "manager", "superadmin")
   findAll(
     @Query("role") role?: string,
     @Query("search") search?: string,
@@ -28,7 +31,7 @@ export class UsersController {
       role,
       search,
       page: page ? parseInt(page) : 1,
-      limit: limit ? parseInt(limit) : 50,
+      limit: limit ? parseInt(limit) : 100,
     });
   }
 
@@ -51,20 +54,43 @@ export class UsersController {
     return this.usersService.changePassword(user.id, body.currentPassword, body.newPassword);
   }
 
+  @Post()
+  @Roles("admin", "superadmin")
+  create(@Body() body: any) {
+    return this.usersService.createUser(body);
+  }
+
   @Get(":id")
-  @Roles("admin", "manager")
+  @Roles("admin", "manager", "superadmin")
   findOne(@Param("id", ParseIntPipe) id: number) {
     return this.usersService.findById(id);
   }
 
   @Patch(":id")
-  @Roles("admin")
+  @Roles("admin", "superadmin")
   update(@Param("id", ParseIntPipe) id: number, @Body() body: any) {
     return this.usersService.update(id, body);
   }
 
+  @Post(":id/reset-password")
+  @Roles("admin", "superadmin")
+  @HttpCode(HttpStatus.OK)
+  resetPassword(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() body: { newPassword: string }
+  ) {
+    return this.usersService.adminResetPassword(id, body.newPassword);
+  }
+
+  @Post(":id/toggle-active")
+  @Roles("admin", "superadmin")
+  @HttpCode(HttpStatus.OK)
+  toggleActive(@Param("id", ParseIntPipe) id: number) {
+    return this.usersService.toggleActive(id);
+  }
+
   @Delete(":id")
-  @Roles("admin")
+  @Roles("admin", "superadmin")
   delete(@Param("id", ParseIntPipe) id: number) {
     return this.usersService.delete(id);
   }

@@ -57,6 +57,12 @@ export class SalesService {
     return updated;
   }
 
+  async deleteProduct(id: number) {
+    const [deleted] = await this.db.delete(saleProductsTable).where(eq(saleProductsTable.id, id)).returning({ id: saleProductsTable.id });
+    if (!deleted) throw new NotFoundException("Товар для продажи не найден");
+    return { message: "Товар удалён" };
+  }
+
   async findAllOrders(params: { status?: string; page?: number; limit?: number }) {
     const { status, page = 1, limit = 50 } = params;
     const offset = (page - 1) * limit;

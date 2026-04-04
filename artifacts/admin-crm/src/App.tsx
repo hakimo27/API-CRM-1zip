@@ -14,6 +14,12 @@ import ToursPage from '@/pages/ToursPage';
 import ChatPage from '@/pages/ChatPage';
 import UsersPage from '@/pages/UsersPage';
 import SettingsPage from '@/pages/SettingsPage';
+import BranchesPage from '@/pages/BranchesPage';
+import CategoriesPage from '@/pages/CategoriesPage';
+import SaleProductsPage from '@/pages/SaleProductsPage';
+import ContentPage from '@/pages/ContentPage';
+import LogsPage from '@/pages/LogsPage';
+import MediaPage from '@/pages/MediaPage';
 import { useEffect } from 'react';
 
 const queryClient = new QueryClient({
@@ -35,69 +41,35 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     </div>
   );
   if (!user) return null;
-  return (
-    <AdminLayout>
-      {children}
-    </AdminLayout>
-  );
+  return <AdminLayout>{children}</AdminLayout>;
+}
+
+function G({ children }: { children: React.ReactNode }) {
+  return <AuthGuard>{children}</AuthGuard>;
 }
 
 function CrmRoutes() {
   return (
     <Switch>
       <Route path="/login" component={LoginPage} />
-      <Route path="/">
-        <AuthGuard>
-          <DashboardPage />
-        </AuthGuard>
-      </Route>
-      <Route path="/orders">
-        <AuthGuard>
-          <OrdersPage />
-        </AuthGuard>
-      </Route>
-      <Route path="/orders/:id">
-        {(params) => (
-          <AuthGuard>
-            <OrderDetailPage id={params.id} />
-          </AuthGuard>
-        )}
-      </Route>
-      <Route path="/inventory">
-        <AuthGuard>
-          <InventoryPage />
-        </AuthGuard>
-      </Route>
-      <Route path="/products">
-        <AuthGuard>
-          <ProductsPage />
-        </AuthGuard>
-      </Route>
-      <Route path="/customers">
-        <AuthGuard>
-          <CustomersPage />
-        </AuthGuard>
-      </Route>
-      <Route path="/tours">
-        <AuthGuard>
-          <ToursPage />
-        </AuthGuard>
-      </Route>
-      <Route path="/chat">
-        <AuthGuard>
-          <ChatPage />
-        </AuthGuard>
-      </Route>
-      <Route path="/users">
-        <AuthGuard>
-          <UsersPage />
-        </AuthGuard>
-      </Route>
-      <Route path="/settings">
-        <AuthGuard>
-          <SettingsPage />
-        </AuthGuard>
-      </Route>
+      <Route path="/"><G><DashboardPage /></G></Route>
+      <Route path="/orders"><G><OrdersPage /></G></Route>
+      <Route path="/orders/:id">{(p) => <G><OrderDetailPage id={p.id} /></G>}</Route>
+      <Route path="/inventory"><G><InventoryPage /></G></Route>
+      <Route path="/products"><G><ProductsPage /></G></Route>
+      <Route path="/sale-products"><G><SaleProductsPage /></G></Route>
+      <Route path="/categories"><G><CategoriesPage /></G></Route>
+      <Route path="/customers"><G><CustomersPage /></G></Route>
+      <Route path="/tours"><G><ToursPage /></G></Route>
+      <Route path="/branches"><G><BranchesPage /></G></Route>
+      <Route path="/chat"><G><ChatPage /></G></Route>
+      <Route path="/users"><G><UsersPage /></G></Route>
+      <Route path="/content/:tab">{(p) => <G><ContentPage tab={p.tab} /></G>}</Route>
+      <Route path="/content"><G><ContentPage tab="articles" /></G></Route>
+      <Route path="/templates"><G><ContentPage tab="templates" /></G></Route>
+      <Route path="/settings"><G><SettingsPage /></G></Route>
+      <Route path="/logs"><G><LogsPage /></G></Route>
+      <Route path="/media"><G><MediaPage /></G></Route>
     </Switch>
   );
 }

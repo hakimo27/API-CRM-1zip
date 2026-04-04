@@ -53,10 +53,34 @@ export class ContentController {
     return this.contentService.getPages();
   }
 
+  @Get("pages/admin")
+  @Roles("admin", "manager", "editor")
+  getPagesAdmin() {
+    return this.contentService.getPagesAdmin();
+  }
+
+  @Post("pages")
+  @Roles("admin", "manager", "editor")
+  createPage(@Body() body: any) {
+    return this.contentService.createPage(body);
+  }
+
   @Public()
   @Get("pages/:slug")
   getPage(@Param("slug") slug: string) {
     return this.contentService.getPageBySlug(slug);
+  }
+
+  @Patch("pages/:id")
+  @Roles("admin", "manager", "editor")
+  updatePage(@Param("id", ParseIntPipe) id: number, @Body() body: any) {
+    return this.contentService.updatePage(id, body);
+  }
+
+  @Delete("pages/:id")
+  @Roles("admin", "manager", "editor")
+  deletePage(@Param("id", ParseIntPipe) id: number) {
+    return this.contentService.deletePage(id);
   }
 
   @Put("pages/:slug")
@@ -112,6 +136,12 @@ export class ContentController {
   @Post("reviews")
   createReview(@Body() body: any) {
     return this.contentService.createReview(body);
+  }
+
+  @Patch("reviews/:id")
+  @Roles("admin", "manager")
+  updateReview(@Param("id", ParseIntPipe) id: number, @Body() body: any) {
+    return this.contentService.updateReview(id, body);
   }
 
   @Patch("reviews/:id/approve")

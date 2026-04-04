@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException, Inject } from "@nestjs/common";
-import { eq, and, asc, desc, gte, lt } from "drizzle-orm";
+import { Injectable, NotFoundException, Inject, BadRequestException } from "@nestjs/common";
+import { eq, and, asc, desc, gte, like, or, sql } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
 import { toursTable, tourDatesTable, tourBookingsTable, usersTable } from "@workspace/db";
 
@@ -23,37 +23,151 @@ export class ToursService {
     return tours;
   }
 
+  async findAllAdmin(params: { type?: string; active?: string; search?: string }) {
+    const { type, active, search } = params;
+    let tours = await this.db
+      .select()
+      .from(toursTable)
+      .orderBy(asc(toursTable.sortOrder), desc(toursTable.createdAt));
+
+    if (type) tours = tours.filter((t) => t.type === type);
+    if (active === "true") tours = tours.filter((t) => t.active === true);
+    if (active === "false") tours = tours.filter((t) => t.active === false);
+    if (search) {
+      const q = search.toLowerCase();
+      tours = tours.filter((t) => t.title.toLowerCase().includes(q));
+    }
+
+    return tours;
+  }
+
   async findBySlug(slug: string) {
     const [tour] = await this.db.select().from(toursTable).where(eq(toursTable.slug, slug)).limit(1);
     if (!tour) throw new NotFoundException("Тур не найден");
 
-    const upcomingDates = await this.db
+    const now = new Date();
+    const allDates = await this.db
       .select()
       .from(tourDatesTable)
-      .where(
-        and(
-          eq(tourDatesTable.tourId, tour.id),
-          eq(tourDatesTable.status, "planned"),
-          gte(tourDatesTable.startDate, new Date())
-        )
-      )
+      .where(and(eq(tourDatesTable.tourId, tour.id), eq(tourDatesTable.status, "planned")))
       .orderBy(asc(tourDatesTable.startDate))
-      .limit(10);
+      .limit(20);
+
+    const upcomingDates = allDates.filter(d => {
+      try { return d.startDate && new Date(d.startDate) >= now; } catch { return false; }
+    }).slice(0, 10);
 
     return { ...tour, upcomingDates };
   }
 
   async getTourDates(tourId: number) {
-    return this.db
+    const now = new Date();
+    const all = await this.db
       .select()
       .from(tourDatesTable)
-      .where(
-        and(
-          eq(tourDatesTable.tourId, tourId),
-          gte(tourDatesTable.startDate, new Date())
-        )
-      )
+      .where(eq(tourDatesTable.tourId, tourId))
       .orderBy(asc(tourDatesTable.startDate));
+
+    return all.filter(d => {
+      try { return d.startDate && new Date(d.startDate) >= now; } catch { return false; }
+    });
+  }
+
+  async getAllDates(params: { tourId?: number; status?: string; from?: string }) {
+    const { tourId, status, from } = params;
+    let dates = await this.db
+      .select({
+        date: tourDatesTable,
+        tour: { id: toursTable.id, title: toursTable.title, slug: toursTable.slug },
+        instructor: {
+          id: usersTable.id,
+          firstName: usersTable.firstName,
+          lastName: usersTable.lastName,
+        },
+      })
+      .from(tourDatesTable)
+      .leftJoin(toursTable, eq(tourDatesTable.tourId, toursTable.id))
+      .leftJoin(usersTable, eq(tourDatesTable.instructorId, usersTable.id))
+      .orderBy(asc(tourDatesTable.startDate));
+
+    if (tourId) dates = dates.filter((d) => d.date.tourId === tourId);
+    if (status) dates = dates.filter((d) => d.date.status === status);
+    if (from) dates = dates.filter((d) => d.date.startDate >= new Date(from));
+
+    return dates.map(({ date, tour, instructor }) => ({ ...date, tour, instructor }));
+  }
+
+  async create(data: any) {
+    if (!data.slug && data.title) {
+      data.slug = data.title
+        .toLowerCase()
+        .replace(/[^a-zа-я0-9\s]/gi, "")
+        .replace(/\s+/g, "-")
+        .replace(/[а-я]/g, (c: string) => {
+          const map: Record<string, string> = {
+            а:"a",б:"b",в:"v",г:"g",д:"d",е:"e",ё:"yo",ж:"zh",з:"z",
+            и:"i",й:"y",к:"k",л:"l",м:"m",н:"n",о:"o",п:"p",р:"r",
+            с:"s",т:"t",у:"u",ф:"f",х:"kh",ц:"ts",ч:"ch",ш:"sh",
+            щ:"shch",ъ:"",ы:"y",ь:"",э:"e",ю:"yu",я:"ya",
+          };
+          return map[c] || c;
+        });
+    }
+    const [created] = await this.db.insert(toursTable).values(data).returning();
+    return created;
+  }
+
+  async update(id: number, data: any) {
+    const [updated] = await this.db
+      .update(toursTable)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(toursTable.id, id))
+      .returning();
+    if (!updated) throw new NotFoundException("Тур не найден");
+    return updated;
+  }
+
+  async delete(id: number) {
+    const [deleted] = await this.db
+      .delete(toursTable)
+      .where(eq(toursTable.id, id))
+      .returning({ id: toursTable.id });
+    if (!deleted) throw new NotFoundException("Тур не найден");
+    return { message: "Тур удалён" };
+  }
+
+  async createDate(data: any) {
+    const [created] = await this.db.insert(tourDatesTable).values(data).returning();
+    return created;
+  }
+
+  async updateDate(dateId: number, data: any) {
+    const [updated] = await this.db
+      .update(tourDatesTable)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(tourDatesTable.id, dateId))
+      .returning();
+    if (!updated) throw new NotFoundException("Дата тура не найдена");
+    return updated;
+  }
+
+  async deleteDate(dateId: number) {
+    const [deleted] = await this.db
+      .delete(tourDatesTable)
+      .where(eq(tourDatesTable.id, dateId))
+      .returning({ id: tourDatesTable.id });
+    if (!deleted) throw new NotFoundException("Дата тура не найдена");
+    return { message: "Дата тура удалена" };
+  }
+
+  async updateBooking(bookingId: number, data: any) {
+    const [updated] = await this.db
+      .update(tourBookingsTable)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(tourBookingsTable.id, bookingId))
+      .returning();
+    if (!updated) throw new NotFoundException("Бронирование не найдено");
+    return updated;
   }
 
   async createBooking(tourDateId: number, bookingData: any) {
@@ -67,7 +181,7 @@ export class ToursService {
 
     const availableSeats = tourDate.seatsTotal - tourDate.seatsBooked;
     if (availableSeats < bookingData.participantCount) {
-      throw new NotFoundException(`Осталось мест: ${availableSeats}`);
+      throw new BadRequestException(`Осталось мест: ${availableSeats}`);
     }
 
     const [booking] = await this.db
@@ -91,22 +205,6 @@ export class ToursService {
       .where(eq(tourDatesTable.id, tourDateId));
 
     return booking;
-  }
-
-  async create(data: any) {
-    const [created] = await this.db.insert(toursTable).values(data).returning();
-    return created;
-  }
-
-  async update(id: number, data: any) {
-    const [updated] = await this.db.update(toursTable).set(data).where(eq(toursTable.id, id)).returning();
-    if (!updated) throw new NotFoundException("Тур не найден");
-    return updated;
-  }
-
-  async createDate(data: any) {
-    const [created] = await this.db.insert(tourDatesTable).values(data).returning();
-    return created;
   }
 
   async getBookings(params: { status?: string; tourId?: number }) {

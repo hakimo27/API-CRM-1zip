@@ -177,6 +177,33 @@ export class ContentService {
     return river;
   }
 
+  async createPage(data: any) {
+    const [created] = await this.db.insert(pagesTable).values(data).returning();
+    return created;
+  }
+
+  async updatePage(id: number, data: any) {
+    const [updated] = await this.db.update(pagesTable).set({ ...data, updatedAt: new Date() }).where(eq(pagesTable.id, id)).returning();
+    if (!updated) throw new NotFoundException("Страница не найдена");
+    return updated;
+  }
+
+  async deletePage(id: number) {
+    const [deleted] = await this.db.delete(pagesTable).where(eq(pagesTable.id, id)).returning({ id: pagesTable.id });
+    if (!deleted) throw new NotFoundException("Страница не найдена");
+    return { message: "Страница удалена" };
+  }
+
+  async getPagesAdmin() {
+    return this.db.select().from(pagesTable).orderBy(pagesTable.slug);
+  }
+
+  async updateReview(id: number, data: any) {
+    const [updated] = await this.db.update(reviewsTable).set({ ...data, updatedAt: new Date() }).where(eq(reviewsTable.id, id)).returning();
+    if (!updated) throw new NotFoundException("Отзыв не найден");
+    return updated;
+  }
+
   async createRiver(data: any) {
     const [created] = await this.db.insert(riversTable).values(data).returning();
     return created;

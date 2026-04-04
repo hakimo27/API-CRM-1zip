@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query } from "@nestjs/common";
+import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Query } from "@nestjs/common";
 import { SalesService } from "./sales.service.js";
 import { Public } from "../common/decorators/public.decorator.js";
 import { Roles } from "../common/decorators/roles.decorator.js";
@@ -31,6 +31,12 @@ export class SalesController {
   @Roles("admin", "manager")
   updateProduct(@Param("id", ParseIntPipe) id: number, @Body() body: any) {
     return this.salesService.updateProduct(id, body);
+  }
+
+  @Delete("products/:id")
+  @Roles("admin", "manager")
+  deleteProduct(@Param("id", ParseIntPipe) id: number) {
+    return this.salesService.deleteProduct(id);
   }
 
   // ─── Orders ────────────────────────────────────────────────────────────────

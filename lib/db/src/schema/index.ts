@@ -17,3 +17,5 @@ export * from "./tours";
 export * from "./saleOrders";
 export * from "./articles";
 export * from "./settings";
+export * from "./auditLogs";
+export * from "./systemLogs";
