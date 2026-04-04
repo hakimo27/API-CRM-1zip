@@ -27,6 +27,22 @@ export class AvailabilityController {
   }
 
   @Public()
+  @Get("product")
+  checkProduct(
+    @Query("productId", ParseIntPipe) productId: number,
+    @Query("startDate") startDate: string,
+    @Query("endDate") endDate: string,
+    @Query("quantity") quantity?: string
+  ) {
+    return this.availabilityService.getProductAvailabilityInfo(
+      productId,
+      new Date(startDate),
+      new Date(endDate),
+      quantity ? parseInt(quantity) : 1
+    );
+  }
+
+  @Public()
   @Get("pricing")
   async getPricing(
     @Query("productId", ParseIntPipe) productId: number,

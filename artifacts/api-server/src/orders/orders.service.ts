@@ -5,7 +5,7 @@ import {
   Inject,
   Logger,
 } from "@nestjs/common";
-import { eq, desc, and, or, like, inArray } from "drizzle-orm";
+import { eq, desc, and, or, like, inArray, not, lt, gt } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
 import {
   ordersTable,
@@ -196,9 +196,14 @@ export class OrdersService {
 
       if (!availability.allAvailable) {
         const unavailable = availability.items.filter((i: any) => !i.available);
-        throw new BadRequestException(
-          `Недостаточно единиц для аренды: ${unavailable.map((i: any) => `ID ${i.productId}`).join(", ")}`
-        );
+        const messages = unavailable.map((i: any) => {
+          const name = i.productName || `Товар #${i.productId}`;
+          if (i.availableUnits === 0) {
+            return `Товар "${name}" недоступен на выбранные даты`;
+          }
+          return `Для товара "${name}" доступно только ${i.availableUnits} ед., запрошено: ${i.requestedQuantity}`;
+        });
+        throw new BadRequestException(messages.join(". "));
       }
     }
 
@@ -342,6 +347,107 @@ export class OrdersService {
 
     if (!updated) throw new NotFoundException("Заказ не найден");
     return updated;
+  }
+
+  async extendOrder(id: number, newEndDate: string) {
+    const [order] = await this.db
+      .select()
+      .from(ordersTable)
+      .where(eq(ordersTable.id, id))
+      .limit(1);
+
+    if (!order) throw new NotFoundException("Заказ не найден");
+
+    if (["cancelled", "completed", "refunded"].includes(order.status as string)) {
+      throw new BadRequestException("Нельзя продлить завершённый или отменённый заказ");
+    }
+
+    if (!order.startDate || !order.endDate) {
+      throw new BadRequestException("У заказа нет дат аренды — продление недоступно");
+    }
+
+    const newEnd = new Date(newEndDate);
+    const currentEnd = new Date(order.endDate as string);
+
+    if (newEnd <= currentEnd) {
+      throw new BadRequestException("Новая дата окончания должна быть позже текущей");
+    }
+
+    // Check availability for all items from the extended period
+    const items = await this.db
+      .select({ item: orderItemsTable, product: productsTable })
+      .from(orderItemsTable)
+      .leftJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
+      .where(eq(orderItemsTable.orderId, id));
+
+    if (items.length > 0) {
+      // Check each product for conflicts in the extension window (currentEnd → newEnd)
+      for (const { item, product } of items) {
+        const extConflicts = await this.db
+          .select({ cnt: orderItemsTable.quantity })
+          .from(orderItemsTable)
+          .innerJoin(ordersTable, eq(orderItemsTable.orderId, ordersTable.id))
+          .where(
+            and(
+              eq(orderItemsTable.productId, item.productId!),
+              not(inArray(ordersTable.status, ["cancelled", "completed", "refunded"])),
+              not(eq(orderItemsTable.orderId, id)),
+              lt(orderItemsTable.startDate, newEnd),
+              gt(orderItemsTable.endDate, currentEnd)
+            )
+          );
+
+        if (extConflicts.length > 0) {
+          const name = product?.name ?? `Товар #${item.productId}`;
+          throw new BadRequestException(
+            `Невозможно продлить заказ: товар "${name}" уже забронирован на выбранный период`
+          );
+        }
+      }
+    }
+
+    // Update order end date
+    await this.db
+      .update(ordersTable)
+      .set({ endDate: newEnd } as any)
+      .where(eq(ordersTable.id, id));
+
+    // Update all order items' end dates
+    await this.db
+      .update(orderItemsTable)
+      .set({ endDate: newEnd } as any)
+      .where(eq(orderItemsTable.orderId, id));
+
+    // Recalculate price if possible
+    if (order.startDate) {
+      try {
+        const itemsForPricing = items.map(({ item }) => ({
+          productId: item.productId!,
+          quantity: item.quantity ?? 1,
+          tariffId: item.tariffId ?? undefined,
+          pricePerDay: item.pricePerDay ? Number(item.pricePerDay) : undefined,
+        }));
+        const pricing = await this.pricingService.calculateProductsPrice(
+          itemsForPricing,
+          new Date(order.startDate as string),
+          newEnd
+        );
+        await this.db
+          .update(ordersTable)
+          .set({ totalAmount: String(pricing.totalPrice) } as any)
+          .where(eq(ordersTable.id, id));
+      } catch {
+        // Best-effort — if pricing fails, keep old total
+      }
+    }
+
+    await this.db.insert(orderStatusHistoryTable).values({
+      orderId: id,
+      status: order.status as any,
+      comment: `Заказ продлён до ${newEnd.toLocaleDateString("ru-RU")}`,
+    });
+
+    return this.findByNumber(order.orderNumber!);
   }
 
   async getStats() {

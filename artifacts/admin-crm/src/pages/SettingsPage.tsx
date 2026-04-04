@@ -1,14 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Save, RotateCcw, Eye, EyeOff, Loader2, CheckCircle2, XCircle,
   AlertTriangle, Settings, Phone, Palette, Calendar, Truck,
-  Send, Bell, Info,
+  Send, Bell, Info, Upload, X,
 } from 'lucide-react';
 
 // ─── FIELD TYPE ───────────────────────────────────────────────────────────────
-type FieldType = 'text' | 'number' | 'boolean' | 'password' | 'color' | 'url' | 'textarea' | 'tel';
+type FieldType = 'text' | 'number' | 'boolean' | 'password' | 'color' | 'url' | 'textarea' | 'tel' | 'image';
 interface FieldDef {
   key: string;
   label: string;
@@ -69,12 +69,12 @@ const TABS: TabDef[] = [
     label: 'Брендинг',
     saveLabel: 'брендинг',
     fields: [
-      { key: 'branding.logo_url',       label: 'Логотип',                 type: 'url',  hint: 'URL изображения логотипа', placeholder: 'https://...' },
-      { key: 'branding.logo_light_url', label: 'Логотип для светлого фона', type: 'url', hint: 'Версия логотипа для белых фонов', placeholder: 'https://...' },
-      { key: 'branding.favicon_url',    label: 'Favicon',                 type: 'url',  hint: 'URL иконки для браузерной вкладки (.ico или .png)', placeholder: 'https://...' },
+      { key: 'branding.logo_url',       label: 'Логотип',                 type: 'image', hint: 'Логотип сайта (рекомендуется SVG или PNG с прозрачностью)' },
+      { key: 'branding.logo_light_url', label: 'Логотип для светлого фона', type: 'image', hint: 'Версия логотипа для белых фонов' },
+      { key: 'branding.favicon_url',    label: 'Favicon',                 type: 'image', hint: 'Иконка для браузерной вкладки (.ico или .png, 32×32 px)' },
       { key: 'branding.primary_color',  label: 'Основной цвет',           type: 'color', hint: 'Основной акцентный цвет сайта' },
       { key: 'branding.secondary_color',label: 'Дополнительный цвет',     type: 'color' },
-      { key: 'branding.og_image_url',   label: 'OG Image по умолчанию',   type: 'url',  hint: 'Изображение для предпросмотра в соцсетях (1200×630 px)', placeholder: 'https://...' },
+      { key: 'branding.og_image_url',   label: 'OG Image по умолчанию',   type: 'image', hint: 'Изображение для предпросмотра в соцсетях (1200×630 px)' },
     ],
   },
   {
@@ -181,6 +181,62 @@ function Toast({ toast }: { toast: ToastState | null }) {
   );
 }
 
+// ─── IMAGE UPLOADER ────────────────────────────────────────────────────────────
+function ImageFieldInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const result = await api.upload<{ url: string }>('/media/upload?folder=settings', fd);
+      onChange(result.url);
+    } catch (err: any) {
+      alert('Ошибка загрузки: ' + err.message);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className="space-y-2 max-w-md">
+      {value ? (
+        <div className="relative inline-block">
+          <img src={value} alt="preview" className="h-16 w-auto rounded-lg border border-gray-200 object-contain bg-gray-50 p-1" />
+          <button type="button" onClick={() => onChange('')}
+            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-600">
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      ) : (
+        <div className="h-16 w-32 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300">
+          <Upload className="w-6 h-6" />
+        </div>
+      )}
+      <div className="flex gap-2 items-center flex-wrap">
+        <input
+          type="text"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder="https://... или загрузите файл"
+          className="flex-1 min-w-0 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+          className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 rounded-xl text-sm font-medium hover:bg-blue-100 disabled:opacity-50 flex-shrink-0 whitespace-nowrap">
+          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          {uploading ? 'Загрузка…' : 'Загрузить файл'}
+        </button>
+        <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+      </div>
+    </div>
+  );
+}
+
 // ─── FIELD RENDERER ───────────────────────────────────────────────────────────
 function FieldInput({
   field, value, onChange,
@@ -237,6 +293,10 @@ function FieldInput({
         className="w-full max-w-lg px-3 py-2.5 border border-gray-200 rounded-xl text-sm
           focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
     );
+  }
+
+  if (field.type === 'image') {
+    return <ImageFieldInput value={strVal} onChange={v => onChange(v)} />;
   }
 
   return (

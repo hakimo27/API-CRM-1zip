@@ -8,12 +8,12 @@ const inputCls = "w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:out
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-xl my-8">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="font-semibold text-gray-900">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 rounded-lg p-1 hover:bg-gray-100"><X className="w-5 h-5" /></button>
         </div>
         {children}
       </div>
@@ -158,7 +158,7 @@ export default function BranchesPage() {
 
       {(creating || editing) && (
         <Modal title={creating ? 'Новый филиал' : 'Редактировать филиал'} onClose={() => { setCreating(false); setEditing(null); }}>
-          <div className="px-6 py-4 space-y-4">
+          <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <F label="Название *">
                 <input value={form.name}
@@ -221,12 +221,12 @@ export default function BranchesPage() {
               </label>
             </div>
           </div>
-          <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+          <div className="flex gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0 bg-white rounded-b-2xl">
             <button onClick={() => { setCreating(false); setEditing(null); }}
-              className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium">Отмена</button>
+              className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">Отмена</button>
             <button onClick={() => creating ? createMut.mutate(form) : updateMut.mutate({ id: editing.id, data: form })}
               disabled={createMut.isPending || updateMut.isPending}
-              className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+              className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
               {(createMut.isPending || updateMut.isPending) ? 'Сохранение...' : 'Сохранить'}
             </button>
           </div>

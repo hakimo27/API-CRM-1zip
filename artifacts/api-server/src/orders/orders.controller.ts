@@ -47,6 +47,15 @@ export class OrdersController {
     return this.ordersService.create(body);
   }
 
+  @Patch(":id/extend")
+  @Roles("admin", "manager")
+  extend(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() body: { endDate: string }
+  ) {
+    return this.ordersService.extendOrder(id, body.endDate);
+  }
+
   @Patch(":id/status")
   @Roles("admin", "manager")
   updateStatus(

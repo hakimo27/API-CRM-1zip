@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Link } from 'wouter';
-import { Search, Filter, RefreshCw, ChevronRight } from 'lucide-react';
+import { Search, RefreshCw, ChevronRight, CalendarPlus, X } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const STATUSES = [
   { value: '', label: 'Все' },
@@ -33,10 +34,25 @@ const STATUS_LABEL: Record<string, string> = {
   completed: 'Завершён', cancelled: 'Отменён',
 };
 
+const CAN_EXTEND = ['new', 'confirmed', 'paid', 'assembled', 'issued'];
+
+function fmt(d: string | null | undefined) {
+  if (!d) return null;
+  return new Date(d).toLocaleDateString('ru-RU');
+}
+
+function toInputDate(d: string | null | undefined) {
+  if (!d) return '';
+  return new Date(d).toISOString().split('T')[0];
+}
+
 export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [extendOrder, setExtendOrder] = useState<any>(null);
+  const [extendDate, setExtendDate] = useState('');
   const qc = useQueryClient();
+  const { toast } = useToast();
 
   const { data: orders = [], isLoading, refetch } = useQuery<any[]>({
     queryKey: ['orders', statusFilter],
@@ -46,6 +62,18 @@ export default function OrdersPage() {
     },
   });
 
+  const extendMut = useMutation({
+    mutationFn: ({ id, endDate }: { id: number; endDate: string }) =>
+      api.patch(`/orders/${id}/extend`, { endDate }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      toast({ title: 'Заказ продлён', description: `Новая дата окончания: ${new Date(extendDate).toLocaleDateString('ru-RU')}` });
+      setExtendOrder(null);
+      setExtendDate('');
+    },
+    onError: (e: any) => toast({ title: 'Ошибка', description: e.message, variant: 'destructive' }),
+  });
+
   const filtered = search
     ? orders.filter(o =>
         o.orderNumber?.toLowerCase().includes(search.toLowerCase()) ||
@@ -53,6 +81,11 @@ export default function OrdersPage() {
         o.customerPhone?.includes(search)
       )
     : orders;
+
+  const openExtend = (order: any) => {
+    setExtendOrder(order);
+    setExtendDate(toInputDate(order.endDate) || '');
+  };
 
   return (
     <div className="space-y-4">
@@ -111,8 +144,8 @@ export default function OrdersPage() {
                   <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Номер</th>
                   <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Клиент</th>
                   <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
+                  <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Период</th>
                   <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Сумма</th>
-                  <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
                   <th className="px-6 py-3"></th>
                 </tr>
               </thead>
@@ -133,17 +166,29 @@ export default function OrdersPage() {
                         {STATUS_LABEL[order.status] || order.status}
                       </span>
                     </td>
+                    <td className="px-6 py-4 text-xs text-gray-500 whitespace-nowrap">
+                      {fmt(order.startDate) ? (
+                        <span>{fmt(order.startDate)} — {fmt(order.endDate) || '?'}</span>
+                      ) : (
+                        <span className="text-gray-300">без дат</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 font-semibold text-sm text-gray-900 whitespace-nowrap">
                       {Number(order.totalAmount || 0).toLocaleString('ru-RU')} ₽
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                      {new Date(order.createdAt).toLocaleDateString('ru-RU')}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <Link href={`/orders/${order.id}`}
-                        className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
-                        Открыть <ChevronRight className="w-3 h-3" />
-                      </Link>
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-2">
+                        {order.endDate && CAN_EXTEND.includes(order.status) && (
+                          <button onClick={() => openExtend(order)}
+                            className="inline-flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2 py-1 rounded-lg transition-colors">
+                            <CalendarPlus className="w-3.5 h-3.5" /> Продлить
+                          </button>
+                        )}
+                        <Link href={`/orders/${order.id}`}
+                          className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
+                          Открыть <ChevronRight className="w-3 h-3" />
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -152,6 +197,57 @@ export default function OrdersPage() {
           </div>
         )}
       </div>
+
+      {/* Extend Order Modal */}
+      {extendOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setExtendOrder(null)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="font-semibold text-gray-900">Продлить заказ</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{extendOrder.orderNumber}</p>
+              </div>
+              <button onClick={() => setExtendOrder(null)} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-600">
+                <span className="text-gray-400">Текущая дата окончания: </span>
+                <span className="font-medium">{fmt(extendOrder.endDate)}</span>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Новая дата окончания *
+                </label>
+                <input
+                  type="date"
+                  value={extendDate}
+                  min={toInputDate(extendOrder.endDate)}
+                  onChange={e => setExtendDate(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+              <p className="text-xs text-gray-400">
+                Система проверит доступность всех товаров на продлённый период. Стоимость будет пересчитана автоматически.
+              </p>
+            </div>
+            <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+              <button onClick={() => setExtendOrder(null)}
+                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                Отмена
+              </button>
+              <button
+                onClick={() => extendDate && extendMut.mutate({ id: extendOrder.id, endDate: extendDate })}
+                disabled={!extendDate || extendMut.isPending}
+                className="flex-1 px-4 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition-colors">
+                {extendMut.isPending ? 'Продление...' : 'Продлить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
