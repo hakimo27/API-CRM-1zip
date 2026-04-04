@@ -46,6 +46,12 @@ export class ProductsController {
     return this.productsService.create(body);
   }
 
+  @Patch(":id/images")
+  @Roles("admin", "manager")
+  syncImages(@Param("id", ParseIntPipe) id: number, @Body() body: { urls: string[] }) {
+    return this.productsService.syncImages(id, body.urls || []);
+  }
+
   @Patch(":id")
   @Roles("admin", "manager")
   update(@Param("id", ParseIntPipe) id: number, @Body() body: any) {

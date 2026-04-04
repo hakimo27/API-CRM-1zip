@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Tag, ExternalLink, Search, Plus, Edit, Trash2, X, Save, ChevronDown, ChevronUp } from 'lucide-react';
+import ImageUpload from '@/components/ImageUpload';
 import { useState, useEffect, useCallback } from 'react';
 
 const DOMAIN_SCOPE_LABELS: Record<string, string> = {
@@ -26,6 +27,7 @@ type ProductForm = {
   active: boolean; featured: boolean; depositAmount: string; badge: string;
   metaTitle: string; metaDescription: string; ogTitle: string; ogDescription: string; canonicalUrl: string;
   tariffs: Tariff[];
+  images: string[];
 };
 
 const EMPTY_FORM: ProductForm = {
@@ -34,6 +36,7 @@ const EMPTY_FORM: ProductForm = {
   depositAmount: '', badge: '',
   metaTitle: '', metaDescription: '', ogTitle: '', ogDescription: '', canonicalUrl: '',
   tariffs: [{ type: 'weekday', label: 'Будни', pricePerDay: '', minDays: '1' }],
+  images: [],
 };
 
 function slugify(str: string) {
@@ -43,7 +46,7 @@ function slugify(str: string) {
   }).replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
 
-type ModalTab = 'basic' | 'tariffs' | 'seo';
+type ModalTab = 'basic' | 'tariffs' | 'photos' | 'seo';
 
 export default function ProductsPage() {
   const qc = useQueryClient();
@@ -99,6 +102,7 @@ export default function ProductsPage() {
       tariffs: p.tariffs?.length
         ? p.tariffs.map((t: any) => ({ id: t.id, type: t.type, label: t.label, pricePerDay: String(t.pricePerDay || ''), minDays: String(t.minDays || '1') }))
         : [{ type: 'weekday', label: 'Будни', pricePerDay: '', minDays: '1' }],
+      images: Array.isArray(p.images) ? p.images.map((img: any) => typeof img === 'string' ? img : img.url) : [],
     });
     setEditProduct(p);
     setSlugManual(true);
@@ -137,8 +141,14 @@ export default function ProductsPage() {
           pricePerDay: t.pricePerDay, minDays: t.minDays ? Number(t.minDays) : null,
         })),
       };
-      if (editProduct) return api.patch(`/products/${editProduct.id}`, payload);
-      return api.post('/products', payload);
+      let saved: any;
+      if (editProduct) saved = await api.patch(`/products/${editProduct.id}`, payload);
+      else saved = await api.post('/products', payload);
+      const productId = saved?.id || editProduct?.id;
+      if (productId) {
+        await api.patch(`/products/${productId}/images`, { urls: form.images });
+      }
+      return saved;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['products-admin'] });
@@ -307,12 +317,12 @@ export default function ProductsPage() {
 
             {/* Modal Tabs */}
             <div className="flex border-b border-gray-100">
-              {(['basic', 'tariffs', 'seo'] as const).map(tab => (
+              {(['basic', 'tariffs', 'photos', 'seo'] as const).map(tab => (
                 <button key={tab} onClick={() => setModalTab(tab)}
                   className={`px-5 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
                     modalTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}>
-                  {tab === 'basic' ? 'Основное' : tab === 'tariffs' ? 'Тарифы' : 'SEO'}
+                  {tab === 'basic' ? 'Основное' : tab === 'tariffs' ? 'Тарифы' : tab === 'photos' ? `Фото (${form.images.length})` : 'SEO'}
                 </button>
               ))}
             </div>
@@ -458,6 +468,24 @@ export default function ProductsPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Photos Tab */}
+              {modalTab === 'photos' && (
+                <div>
+                  {!editProduct && (
+                    <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
+                      Сначала сохраните товар, затем добавьте фотографии.
+                    </div>
+                  )}
+                  <ImageUpload
+                    images={form.images}
+                    onChange={imgs => setField('images', imgs)}
+                    folder="products"
+                    maxImages={10}
+                    label="Фотографии товара"
+                  />
                 </div>
               )}
 

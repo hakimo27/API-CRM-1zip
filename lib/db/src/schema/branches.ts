@@ -19,6 +19,7 @@ export const branchesTable = pgTable("branches", {
   workingHours: jsonb("working_hours").$type<Record<string, string>>().default({}),
   description: text("description"),
   active: boolean("active").notNull().default(true),
+  useForPickup: boolean("use_for_pickup").notNull().default(false),
   sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

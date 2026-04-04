@@ -163,117 +163,6 @@ export default function ToursPage() {
     cancelled: 'bg-gray-100 text-gray-400',
   };
 
-  const TourForm = () => (
-    <div className="px-6 py-4 space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Название *" col2>
-          <input value={tourForm.title} onChange={e => setTourForm((f: any) => ({ ...f, title: e.target.value }))}
-            className={inputCls} placeholder="Рафтинг по реке Белой" />
-        </Field>
-        <Field label="Слаг">
-          <input value={tourForm.slug} onChange={e => setTourForm((f: any) => ({ ...f, slug: e.target.value }))}
-            className={inputCls} placeholder="rafting-belaya" />
-        </Field>
-        <Field label="Тип">
-          <select value={tourForm.type} onChange={e => setTourForm((f: any) => ({ ...f, type: e.target.value }))} className={inputCls}>
-            {TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-        </Field>
-        <Field label="Сложность">
-          <select value={tourForm.difficulty} onChange={e => setTourForm((f: any) => ({ ...f, difficulty: e.target.value }))} className={inputCls}>
-            {DIFFICULTIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-        </Field>
-        <Field label="Регион / Река">
-          <input value={tourForm.region} onChange={e => setTourForm((f: any) => ({ ...f, region: e.target.value }))}
-            className={inputCls} placeholder="Республика Башкортостан" />
-        </Field>
-        <Field label="Длительность (дней)">
-          <input type="number" value={tourForm.duration} onChange={e => setTourForm((f: any) => ({ ...f, duration: +e.target.value }))}
-            className={inputCls} min={1} />
-        </Field>
-        <Field label="Мин. участников">
-          <input type="number" value={tourForm.minParticipants} onChange={e => setTourForm((f: any) => ({ ...f, minParticipants: +e.target.value }))}
-            className={inputCls} min={1} />
-        </Field>
-        <Field label="Макс. участников">
-          <input type="number" value={tourForm.maxParticipants} onChange={e => setTourForm((f: any) => ({ ...f, maxParticipants: +e.target.value }))}
-            className={inputCls} min={1} />
-        </Field>
-        <Field label="Базовая цена (₽)">
-          <input type="number" value={tourForm.basePrice} onChange={e => setTourForm((f: any) => ({ ...f, basePrice: e.target.value }))}
-            className={inputCls} placeholder="5000" />
-        </Field>
-        <Field label="Депозит (₽)">
-          <input type="number" value={tourForm.depositAmount} onChange={e => setTourForm((f: any) => ({ ...f, depositAmount: e.target.value }))}
-            className={inputCls} placeholder="1000" />
-        </Field>
-        <Field label="Описание" col2>
-          <textarea value={tourForm.description} onChange={e => setTourForm((f: any) => ({ ...f, description: e.target.value }))}
-            className={inputCls + ' resize-none'} rows={3} placeholder="Описание тура..." />
-        </Field>
-        <Field label="Программа" col2>
-          <textarea value={tourForm.program} onChange={e => setTourForm((f: any) => ({ ...f, program: e.target.value }))}
-            className={inputCls + ' resize-none'} rows={2} placeholder="День 1: ..." />
-        </Field>
-      </div>
-      <div className="flex gap-6">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={tourForm.active} onChange={e => setTourForm((f: any) => ({ ...f, active: e.target.checked }))}
-            className="rounded" />
-          Активен
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={tourForm.featured} onChange={e => setTourForm((f: any) => ({ ...f, featured: e.target.checked }))}
-            className="rounded" />
-          На главной
-        </label>
-      </div>
-    </div>
-  );
-
-  const DateForm = () => (
-    <div className="px-6 py-4 space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Тур *" col2>
-          <select value={dateForm.tourId} onChange={e => setDateForm((f: any) => ({ ...f, tourId: +e.target.value }))} className={inputCls}>
-            <option value={0}>— Выберите тур —</option>
-            {tours.map((t: any) => <option key={t.id} value={t.id}>{t.title}</option>)}
-          </select>
-        </Field>
-        <Field label="Начало *">
-          <input type="datetime-local" value={dateForm.startDate} onChange={e => setDateForm((f: any) => ({ ...f, startDate: e.target.value }))} className={inputCls} />
-        </Field>
-        <Field label="Конец *">
-          <input type="datetime-local" value={dateForm.endDate} onChange={e => setDateForm((f: any) => ({ ...f, endDate: e.target.value }))} className={inputCls} />
-        </Field>
-        <Field label="Мест всего">
-          <input type="number" value={dateForm.seatsTotal} onChange={e => setDateForm((f: any) => ({ ...f, seatsTotal: +e.target.value }))} className={inputCls} min={1} />
-        </Field>
-        <Field label="Цена (₽) *">
-          <input type="number" value={dateForm.price} onChange={e => setDateForm((f: any) => ({ ...f, price: e.target.value }))} className={inputCls} placeholder="5000" />
-        </Field>
-        <Field label="Депозит (₽)">
-          <input type="number" value={dateForm.depositAmount} onChange={e => setDateForm((f: any) => ({ ...f, depositAmount: e.target.value }))} className={inputCls} placeholder="1000" />
-        </Field>
-        <Field label="Инструктор">
-          <select value={dateForm.instructorId} onChange={e => setDateForm((f: any) => ({ ...f, instructorId: e.target.value || '' }))} className={inputCls}>
-            <option value="">— Не назначен —</option>
-            {instructors.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
-          </select>
-        </Field>
-        <Field label="Статус">
-          <select value={dateForm.status} onChange={e => setDateForm((f: any) => ({ ...f, status: e.target.value }))} className={inputCls}>
-            {DATE_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-        </Field>
-        <Field label="Заметки" col2>
-          <textarea value={dateForm.notes} onChange={e => setDateForm((f: any) => ({ ...f, notes: e.target.value }))} className={inputCls + ' resize-none'} rows={2} />
-        </Field>
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-2xl border border-gray-100 p-1 flex gap-1">
@@ -453,7 +342,70 @@ export default function ToursPage() {
       {(creatingTour || editingTour) && (
         <Modal title={creatingTour ? 'Новый тур' : 'Редактировать тур'}
           onClose={() => { setCreatingTour(false); setEditingTour(null); }}>
-          <TourForm />
+          <div className="px-6 py-4 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Название *" col2>
+                <input value={tourForm.title} onChange={e => setTourForm((f: any) => ({ ...f, title: e.target.value }))}
+                  className={inputCls} placeholder="Рафтинг по реке Белой" />
+              </Field>
+              <Field label="Слаг">
+                <input value={tourForm.slug} onChange={e => setTourForm((f: any) => ({ ...f, slug: e.target.value }))}
+                  className={inputCls} placeholder="rafting-belaya" />
+              </Field>
+              <Field label="Тип">
+                <select value={tourForm.type} onChange={e => setTourForm((f: any) => ({ ...f, type: e.target.value }))} className={inputCls}>
+                  {TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </Field>
+              <Field label="Сложность">
+                <select value={tourForm.difficulty} onChange={e => setTourForm((f: any) => ({ ...f, difficulty: e.target.value }))} className={inputCls}>
+                  {DIFFICULTIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </Field>
+              <Field label="Регион / Река">
+                <input value={tourForm.region} onChange={e => setTourForm((f: any) => ({ ...f, region: e.target.value }))}
+                  className={inputCls} placeholder="Республика Башкортостан" />
+              </Field>
+              <Field label="Длительность (дней)">
+                <input type="number" value={tourForm.duration} onChange={e => setTourForm((f: any) => ({ ...f, duration: +e.target.value }))}
+                  className={inputCls} min={1} />
+              </Field>
+              <Field label="Мин. участников">
+                <input type="number" value={tourForm.minParticipants} onChange={e => setTourForm((f: any) => ({ ...f, minParticipants: +e.target.value }))}
+                  className={inputCls} min={1} />
+              </Field>
+              <Field label="Макс. участников">
+                <input type="number" value={tourForm.maxParticipants} onChange={e => setTourForm((f: any) => ({ ...f, maxParticipants: +e.target.value }))}
+                  className={inputCls} min={1} />
+              </Field>
+              <Field label="Базовая цена (₽)">
+                <input type="number" value={tourForm.basePrice} onChange={e => setTourForm((f: any) => ({ ...f, basePrice: e.target.value }))}
+                  className={inputCls} placeholder="5000" />
+              </Field>
+              <Field label="Депозит (₽)">
+                <input type="number" value={tourForm.depositAmount} onChange={e => setTourForm((f: any) => ({ ...f, depositAmount: e.target.value }))}
+                  className={inputCls} placeholder="1000" />
+              </Field>
+              <Field label="Описание" col2>
+                <textarea value={tourForm.description} onChange={e => setTourForm((f: any) => ({ ...f, description: e.target.value }))}
+                  className={inputCls + ' resize-none'} rows={3} placeholder="Описание тура..." />
+              </Field>
+              <Field label="Программа" col2>
+                <textarea value={tourForm.program} onChange={e => setTourForm((f: any) => ({ ...f, program: e.target.value }))}
+                  className={inputCls + ' resize-none'} rows={2} placeholder="День 1: ..." />
+              </Field>
+            </div>
+            <div className="flex gap-6">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={tourForm.active} onChange={e => setTourForm((f: any) => ({ ...f, active: e.target.checked }))} className="rounded" />
+                Активен
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={tourForm.featured} onChange={e => setTourForm((f: any) => ({ ...f, featured: e.target.checked }))} className="rounded" />
+                На главной
+              </label>
+            </div>
+          </div>
           <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
             <button onClick={() => { setCreatingTour(false); setEditingTour(null); }}
               className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">Отмена</button>
@@ -470,7 +422,45 @@ export default function ToursPage() {
       {(creatingDate || editingDate) && (
         <Modal title={creatingDate ? 'Добавить дату' : 'Редактировать дату'}
           onClose={() => { setCreatingDate(false); setEditingDate(null); }}>
-          <DateForm />
+          <div className="px-6 py-4 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Тур *" col2>
+                <select value={dateForm.tourId} onChange={e => setDateForm((f: any) => ({ ...f, tourId: +e.target.value }))} className={inputCls}>
+                  <option value={0}>— Выберите тур —</option>
+                  {tours.map((t: any) => <option key={t.id} value={t.id}>{t.title}</option>)}
+                </select>
+              </Field>
+              <Field label="Начало *">
+                <input type="datetime-local" value={dateForm.startDate} onChange={e => setDateForm((f: any) => ({ ...f, startDate: e.target.value }))} className={inputCls} />
+              </Field>
+              <Field label="Конец *">
+                <input type="datetime-local" value={dateForm.endDate} onChange={e => setDateForm((f: any) => ({ ...f, endDate: e.target.value }))} className={inputCls} />
+              </Field>
+              <Field label="Мест всего">
+                <input type="number" value={dateForm.seatsTotal} onChange={e => setDateForm((f: any) => ({ ...f, seatsTotal: +e.target.value }))} className={inputCls} min={1} />
+              </Field>
+              <Field label="Цена (₽) *">
+                <input type="number" value={dateForm.price} onChange={e => setDateForm((f: any) => ({ ...f, price: e.target.value }))} className={inputCls} placeholder="5000" />
+              </Field>
+              <Field label="Депозит (₽)">
+                <input type="number" value={dateForm.depositAmount} onChange={e => setDateForm((f: any) => ({ ...f, depositAmount: e.target.value }))} className={inputCls} placeholder="1000" />
+              </Field>
+              <Field label="Инструктор">
+                <select value={dateForm.instructorId} onChange={e => setDateForm((f: any) => ({ ...f, instructorId: e.target.value || '' }))} className={inputCls}>
+                  <option value="">— Не назначен —</option>
+                  {instructors.map((u: any) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
+                </select>
+              </Field>
+              <Field label="Статус">
+                <select value={dateForm.status} onChange={e => setDateForm((f: any) => ({ ...f, status: e.target.value }))} className={inputCls}>
+                  {DATE_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </Field>
+              <Field label="Заметки" col2>
+                <textarea value={dateForm.notes} onChange={e => setDateForm((f: any) => ({ ...f, notes: e.target.value }))} className={inputCls + ' resize-none'} rows={2} />
+              </Field>
+            </div>
+          </div>
           <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
             <button onClick={() => { setCreatingDate(false); setEditingDate(null); }}
               className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">Отмена</button>

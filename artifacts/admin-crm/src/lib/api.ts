@@ -36,4 +36,19 @@ export const api = {
   put: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  upload: async <T>(path: string, formData: FormData): Promise<T> => {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${BASE}${path}`, { method: 'POST', headers, body: formData });
+    if (res.status === 401) {
+      localStorage.removeItem('crm_token');
+      window.dispatchEvent(new Event('crm:logout'));
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: res.statusText }));
+      throw new Error(err.message || 'Ошибка загрузки файла');
+    }
+    return res.json();
+  },
 };

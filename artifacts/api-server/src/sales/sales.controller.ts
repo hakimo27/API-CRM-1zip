@@ -21,6 +21,12 @@ export class SalesController {
     return this.salesService.findAllProducts({ search });
   }
 
+  @Public()
+  @Get("products/:slug")
+  getProductBySlug(@Param("slug") slug: string) {
+    return this.salesService.findProductBySlug(slug);
+  }
+
   @Post("products")
   @Roles("admin", "manager")
   createProduct(@Body() body: any) {

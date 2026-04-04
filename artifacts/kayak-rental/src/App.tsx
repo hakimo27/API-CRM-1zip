@@ -8,6 +8,8 @@ import PublicLayout from '@/components/PublicLayout';
 import HomePage from '@/pages/HomePage';
 import CatalogPage from '@/pages/CatalogPage';
 import ProductPage from '@/pages/ProductPage';
+import SaleCatalogPage from '@/pages/SaleCatalogPage';
+import SaleProductPage from '@/pages/SaleProductPage';
 import CartPage from '@/pages/CartPage';
 import CheckoutPage from '@/pages/CheckoutPage';
 import OrderConfirmPage from '@/pages/OrderConfirmPage';
@@ -31,6 +33,8 @@ function AppRoutes() {
         <Route path="/" component={HomePage} />
         <Route path="/catalog" component={CatalogPage} />
         <Route path="/catalog/:slug" component={ProductPage} />
+        <Route path="/sale" component={SaleCatalogPage} />
+        <Route path="/sale/:slug" component={SaleProductPage} />
         <Route path="/cart" component={CartPage} />
         <Route path="/checkout" component={CheckoutPage} />
         <Route path="/order/:number" component={OrderConfirmPage} />

@@ -21,6 +21,10 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
+function F({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div><label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>{children}</div>;
+}
+
 function slugify(s: string) {
   return s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 }
@@ -62,35 +66,6 @@ export default function CategoriesPage() {
     setForm({ name: c.name, slug: c.slug, description: c.description || '', active: c.active, sortOrder: c.sortOrder || 0 });
     setEditing(c);
   };
-
-  const F = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div><label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>{children}</div>
-  );
-
-  const CatForm = () => (
-    <div className="px-6 py-4 space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <F label="Название *">
-          <input value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value, slug: slugify(e.target.value) }))}
-            className={inputCls} placeholder="Байдарки" />
-        </F>
-        <F label="Слаг">
-          <input value={form.slug} onChange={e => setForm((f: any) => ({ ...f, slug: e.target.value }))} className={inputCls} />
-        </F>
-        <F label="Порядок сортировки">
-          <input type="number" value={form.sortOrder} onChange={e => setForm((f: any) => ({ ...f, sortOrder: +e.target.value }))} className={inputCls} />
-        </F>
-      </div>
-      <F label="Описание">
-        <textarea value={form.description} onChange={e => setForm((f: any) => ({ ...f, description: e.target.value }))}
-          className={inputCls + ' resize-none'} rows={2} placeholder="Описание категории..." />
-      </F>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={form.active} onChange={e => setForm((f: any) => ({ ...f, active: e.target.checked }))} className="rounded" />
-        Активна
-      </label>
-    </div>
-  );
 
   return (
     <div className="space-y-4">
@@ -147,9 +122,39 @@ export default function CategoriesPage() {
 
       {(creating || editing) && (
         <Modal title={creating ? 'Новая категория' : 'Редактировать категорию'} onClose={() => { setCreating(false); setEditing(null); }}>
-          <CatForm />
+          <div className="px-6 py-4 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <F label="Название *">
+                <input value={form.name}
+                  onChange={e => setForm((f: any) => ({ ...f, name: e.target.value, slug: slugify(e.target.value) }))}
+                  className={inputCls} placeholder="Байдарки" />
+              </F>
+              <F label="Слаг">
+                <input value={form.slug}
+                  onChange={e => setForm((f: any) => ({ ...f, slug: e.target.value }))}
+                  className={inputCls} />
+              </F>
+              <F label="Порядок сортировки">
+                <input type="number" value={form.sortOrder}
+                  onChange={e => setForm((f: any) => ({ ...f, sortOrder: +e.target.value }))}
+                  className={inputCls} />
+              </F>
+            </div>
+            <F label="Описание">
+              <textarea value={form.description}
+                onChange={e => setForm((f: any) => ({ ...f, description: e.target.value }))}
+                className={inputCls + ' resize-none'} rows={2} placeholder="Описание категории..." />
+            </F>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.active}
+                onChange={e => setForm((f: any) => ({ ...f, active: e.target.checked }))}
+                className="rounded" />
+              Активна
+            </label>
+          </div>
           <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
-            <button onClick={() => { setCreating(false); setEditing(null); }} className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium">Отмена</button>
+            <button onClick={() => { setCreating(false); setEditing(null); }}
+              className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium">Отмена</button>
             <button onClick={() => creating ? createMut.mutate(form) : updateMut.mutate({ id: editing.id, data: form })}
               disabled={createMut.isPending || updateMut.isPending}
               className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50">

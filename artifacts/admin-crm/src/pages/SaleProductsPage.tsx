@@ -3,14 +3,15 @@ import { api } from '@/lib/api';
 import { Store, Search, Plus, Pencil, Trash2, X, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import ImageUpload from '@/components/ImageUpload';
 
 const inputCls = "w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm";
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-xl my-8">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">{title}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
@@ -21,13 +22,24 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
+function F({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div><label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>{children}</div>;
+}
+
 function slugify(s: string) {
   return s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 }
 
+const CONDITION_OPTS = [
+  ['new', 'Новый'], ['excellent', 'Отличное'], ['good', 'Хорошее'],
+  ['fair', 'Удовлетворительное'], ['poor', 'Плохое'],
+];
+
 const emptyForm = {
   name: '', slug: '', sku: '', price: '', stock: 0,
   description: '', shortDescription: '', active: true, featured: false,
+  isUsed: false, condition: 'new', manufactureYear: '', inventoryNo: '',
+  images: [] as string[],
 };
 
 export default function SaleProductsPage() {
@@ -38,6 +50,7 @@ export default function SaleProductsPage() {
   const [editing, setEditing] = useState<any>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [form, setForm] = useState<any>(emptyForm);
+  const [tab, setTab] = useState<'basic' | 'photos'>('basic');
 
   const { data: products = [], isLoading } = useQuery<any[]>({
     queryKey: ['sale-products-admin'],
@@ -45,14 +58,20 @@ export default function SaleProductsPage() {
   });
 
   const createMut = useMutation({
-    mutationFn: (data: any) => api.post('/sales/products', data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sale-products-admin'] }); toast({ title: 'Товар создан' }); setCreating(false); setForm(emptyForm); },
+    mutationFn: (data: any) => api.post('/sales/products', {
+      ...data, stockQuantity: data.stock, stock: undefined,
+      manufactureYear: data.manufactureYear ? Number(data.manufactureYear) : null,
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sale-products-admin'] }); toast({ title: 'Товар создан' }); setCreating(false); setForm(emptyForm); setTab('basic'); },
     onError: (e: any) => toast({ title: 'Ошибка', description: e.message, variant: 'destructive' }),
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: any) => api.patch(`/sales/products/${id}`, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sale-products-admin'] }); toast({ title: 'Сохранено' }); setEditing(null); },
+    mutationFn: ({ id, data }: any) => api.patch(`/sales/products/${id}`, {
+      ...data, stockQuantity: data.stock, stock: undefined,
+      manufactureYear: data.manufactureYear ? Number(data.manufactureYear) : null,
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sale-products-admin'] }); toast({ title: 'Сохранено' }); setEditing(null); setTab('basic'); },
     onError: (e: any) => toast({ title: 'Ошибка', description: e.message, variant: 'destructive' }),
   });
 
@@ -68,48 +87,16 @@ export default function SaleProductsPage() {
   });
 
   const openEdit = (p: any) => {
-    setForm({ name: p.name, slug: p.slug, sku: p.sku || '', price: p.price || '', stock: p.stock || 0,
-      description: p.description || '', shortDescription: p.shortDescription || '', active: p.active, featured: p.featured });
+    setForm({
+      name: p.name, slug: p.slug, sku: p.sku || '', price: p.price || '', stock: p.stockQuantity ?? p.stock ?? 0,
+      description: p.description || '', shortDescription: p.shortDescription || '', active: p.active, featured: p.featured,
+      isUsed: p.isUsed || false, condition: p.condition || 'new',
+      manufactureYear: p.manufactureYear || '', inventoryNo: p.inventoryNo || '',
+      images: Array.isArray(p.images) ? p.images : [],
+    });
     setEditing(p);
+    setTab('basic');
   };
-
-  const F = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div><label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>{children}</div>
-  );
-
-  const ProductForm = () => (
-    <div className="px-6 py-4 space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <F label="Название *">
-          <input value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value, slug: slugify(e.target.value) }))}
-            className={inputCls} placeholder="Весло туристическое" />
-        </F>
-        <F label="Слаг">
-          <input value={form.slug} onChange={e => setForm((f: any) => ({ ...f, slug: e.target.value }))} className={inputCls} />
-        </F>
-        <F label="Артикул">
-          <input value={form.sku} onChange={e => setForm((f: any) => ({ ...f, sku: e.target.value }))} className={inputCls} placeholder="SKU-001" />
-        </F>
-        <F label="Цена (₽) *">
-          <input type="number" value={form.price} onChange={e => setForm((f: any) => ({ ...f, price: e.target.value }))} className={inputCls} placeholder="2500" />
-        </F>
-        <F label="Остаток на складе">
-          <input type="number" value={form.stock} onChange={e => setForm((f: any) => ({ ...f, stock: +e.target.value }))} className={inputCls} />
-        </F>
-        <F label="Краткое описание">
-          <input value={form.shortDescription} onChange={e => setForm((f: any) => ({ ...f, shortDescription: e.target.value }))} className={inputCls} />
-        </F>
-        <F label="Описание">
-          <textarea value={form.description} onChange={e => setForm((f: any) => ({ ...f, description: e.target.value }))}
-            className={inputCls + ' resize-none col-span-2'} rows={3} />
-        </F>
-      </div>
-      <div className="flex gap-6">
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm((f: any) => ({ ...f, active: e.target.checked }))} className="rounded" />Активен</label>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.featured} onChange={e => setForm((f: any) => ({ ...f, featured: e.target.checked }))} className="rounded" />Рекомендуемый</label>
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-4">
@@ -120,7 +107,7 @@ export default function SaleProductsPage() {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск по названию, артикулу..."
               className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
           </div>
-          <button onClick={() => { setForm(emptyForm); setCreating(true); }}
+          <button onClick={() => { setForm(emptyForm); setCreating(true); setTab('basic'); }}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700">
             <Plus className="w-4 h-4" /> Добавить
           </button>
@@ -151,12 +138,19 @@ export default function SaleProductsPage() {
                 {filtered.map((p: any) => (
                   <tr key={p.id} className="hover:bg-gray-50/50">
                     <td className="px-6 py-4">
-                      <div className="font-medium text-sm text-gray-900">{p.name}</div>
-                      {p.shortDescription && <div className="text-xs text-gray-400 truncate max-w-[200px]">{p.shortDescription}</div>}
+                      <div className="flex items-center gap-3">
+                        {Array.isArray(p.images) && p.images[0] && (
+                          <img src={p.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                        )}
+                        <div>
+                          <div className="font-medium text-sm text-gray-900">{p.name}</div>
+                          {p.isUsed && <span className="text-xs text-orange-600 font-medium">Б/у</span>}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500 font-mono">{p.sku || '—'}</td>
                     <td className="px-6 py-4 text-sm font-medium">{p.price ? `${Number(p.price).toLocaleString('ru-RU')} ₽` : '—'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{p.stock ?? '—'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{p.stockQuantity ?? p.stock ?? '—'}</td>
                     <td className="px-6 py-4">
                       <button onClick={() => updateMut.mutate({ id: p.id, data: { active: !p.active } })}
                         className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${p.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
@@ -180,9 +174,90 @@ export default function SaleProductsPage() {
 
       {(creating || editing) && (
         <Modal title={creating ? 'Новый товар' : 'Редактировать товар'} onClose={() => { setCreating(false); setEditing(null); }}>
-          <ProductForm />
+          <div className="flex border-b border-gray-100">
+            {(['basic', 'photos'] as const).map(t => (
+              <button key={t} onClick={() => setTab(t)}
+                className={`px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                {t === 'basic' ? 'Основное' : `Фото (${form.images.length})`}
+              </button>
+            ))}
+          </div>
+
+          <div className="px-6 py-4 space-y-4">
+            {tab === 'basic' && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <F label="Название *">
+                    <input value={form.name}
+                      onChange={e => setForm((f: any) => ({ ...f, name: e.target.value, slug: f.slug || slugify(e.target.value) }))}
+                      className={inputCls} placeholder="Весло туристическое" />
+                  </F>
+                  <F label="Слаг">
+                    <input value={form.slug} onChange={e => setForm((f: any) => ({ ...f, slug: e.target.value }))} className={inputCls} />
+                  </F>
+                  <F label="Артикул (SKU)">
+                    <input value={form.sku} onChange={e => setForm((f: any) => ({ ...f, sku: e.target.value }))} className={inputCls} placeholder="SKU-001" />
+                  </F>
+                  <F label="Цена (₽) *">
+                    <input type="number" value={form.price} onChange={e => setForm((f: any) => ({ ...f, price: e.target.value }))} className={inputCls} placeholder="2500" />
+                  </F>
+                  <F label="Остаток">
+                    <input type="number" value={form.stock} onChange={e => setForm((f: any) => ({ ...f, stock: +e.target.value }))} className={inputCls} />
+                  </F>
+                  <F label="Состояние">
+                    <select value={form.condition} onChange={e => setForm((f: any) => ({ ...f, condition: e.target.value }))} className={inputCls}>
+                      {CONDITION_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  </F>
+                  <F label="Год производства">
+                    <input type="number" value={form.manufactureYear}
+                      onChange={e => setForm((f: any) => ({ ...f, manufactureYear: e.target.value }))}
+                      className={inputCls} placeholder="2022" min="2000" max="2030" />
+                  </F>
+                  <F label="Инвентарный №">
+                    <input value={form.inventoryNo} onChange={e => setForm((f: any) => ({ ...f, inventoryNo: e.target.value }))} className={inputCls} placeholder="INV-001" />
+                  </F>
+                </div>
+                <F label="Краткое описание">
+                  <input value={form.shortDescription} onChange={e => setForm((f: any) => ({ ...f, shortDescription: e.target.value }))} className={inputCls} />
+                </F>
+                <F label="Описание">
+                  <textarea value={form.description} onChange={e => setForm((f: any) => ({ ...f, description: e.target.value }))}
+                    className={inputCls + ' resize-none'} rows={3} />
+                </F>
+                <div className="flex gap-6 flex-wrap">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={form.active} onChange={e => setForm((f: any) => ({ ...f, active: e.target.checked }))} className="rounded" />
+                    Активен
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={form.featured} onChange={e => setForm((f: any) => ({ ...f, featured: e.target.checked }))} className="rounded" />
+                    Рекомендуемый
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={form.isUsed}
+                      onChange={e => setForm((f: any) => ({ ...f, isUsed: e.target.checked, condition: e.target.checked ? 'good' : 'new' }))}
+                      className="rounded" />
+                    Б/у
+                  </label>
+                </div>
+              </>
+            )}
+
+            {tab === 'photos' && (
+              <ImageUpload
+                images={form.images}
+                onChange={imgs => setForm((f: any) => ({ ...f, images: imgs }))}
+                folder="sale-products"
+                maxImages={8}
+                label="Фотографии товара"
+              />
+            )}
+          </div>
+
           <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
-            <button onClick={() => { setCreating(false); setEditing(null); }} className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium">Отмена</button>
+            <button onClick={() => { setCreating(false); setEditing(null); }}
+              className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium">Отмена</button>
             <button onClick={() => creating ? createMut.mutate(form) : updateMut.mutate({ id: editing.id, data: form })}
               disabled={createMut.isPending || updateMut.isPending}
               className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
@@ -194,7 +269,7 @@ export default function SaleProductsPage() {
 
       {deletingId !== null && (
         <Modal title="Удалить товар?" onClose={() => setDeletingId(null)}>
-          <div className="px-6 py-4"><p className="text-sm text-gray-600">Товар будет удалён из каталога продаж.</p></div>
+          <div className="px-6 py-4"><p className="text-sm text-gray-600">Это действие нельзя отменить. Все данные товара будут удалены.</p></div>
           <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
             <button onClick={() => setDeletingId(null)} className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium">Отмена</button>
             <button onClick={() => deleteMut.mutate(deletingId!)} disabled={deleteMut.isPending}

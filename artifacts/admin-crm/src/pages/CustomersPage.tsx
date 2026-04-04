@@ -21,15 +21,17 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
+function F({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div><label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>{children}</div>;
+}
+
 const SOURCES = ['site', 'telegram', 'phone', 'vk', 'instagram', 'referral', 'other'];
 const SOURCE_LABELS: Record<string, string> = {
   site: 'Сайт', telegram: 'Telegram', phone: 'Телефон',
   vk: 'ВКонтакте', instagram: 'Instagram', referral: 'Рекомендация', other: 'Другое',
 };
 
-const emptyForm = {
-  firstName: '', lastName: '', email: '', phone: '', source: 'site', notes: '', city: '',
-};
+const emptyForm = { firstName: '', lastName: '', email: '', phone: '', source: 'site', notes: '', city: '' };
 
 export default function CustomersPage() {
   const { toast } = useToast();
@@ -74,31 +76,6 @@ export default function CustomersPage() {
       phone: c.phone || '', source: c.source || 'site', notes: c.notes || '', city: c.city || '' });
     setEditing(c);
   };
-
-  const F = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div><label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>{children}</div>
-  );
-
-  const CustomerForm = () => (
-    <div className="px-6 py-4 space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <F label="Имя *"><input value={form.firstName} onChange={e => setForm((f: any) => ({ ...f, firstName: e.target.value }))} className={inputCls} placeholder="Иван" /></F>
-        <F label="Фамилия"><input value={form.lastName} onChange={e => setForm((f: any) => ({ ...f, lastName: e.target.value }))} className={inputCls} placeholder="Иванов" /></F>
-        <F label="Email"><input type="email" value={form.email} onChange={e => setForm((f: any) => ({ ...f, email: e.target.value }))} className={inputCls} placeholder="ivan@example.com" /></F>
-        <F label="Телефон"><input value={form.phone} onChange={e => setForm((f: any) => ({ ...f, phone: e.target.value }))} className={inputCls} placeholder="+7 (999) 000-00-00" /></F>
-        <F label="Город"><input value={form.city} onChange={e => setForm((f: any) => ({ ...f, city: e.target.value }))} className={inputCls} placeholder="Москва" /></F>
-        <F label="Источник">
-          <select value={form.source} onChange={e => setForm((f: any) => ({ ...f, source: e.target.value }))} className={inputCls}>
-            {SOURCES.map(s => <option key={s} value={s}>{SOURCE_LABELS[s]}</option>)}
-          </select>
-        </F>
-      </div>
-      <F label="Заметки">
-        <textarea value={form.notes} onChange={e => setForm((f: any) => ({ ...f, notes: e.target.value }))}
-          className={inputCls + ' resize-none'} rows={2} placeholder="Заметки о клиенте..." />
-      </F>
-    </div>
-  );
 
   return (
     <div className="space-y-4">
@@ -174,7 +151,39 @@ export default function CustomersPage() {
 
       {(creating || editing) && (
         <Modal title={creating ? 'Новый клиент' : 'Редактировать клиента'} onClose={() => { setCreating(false); setEditing(null); }}>
-          <CustomerForm />
+          <div className="px-6 py-4 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <F label="Имя *">
+                <input value={form.firstName} onChange={e => setForm((f: any) => ({ ...f, firstName: e.target.value }))}
+                  className={inputCls} placeholder="Иван" />
+              </F>
+              <F label="Фамилия">
+                <input value={form.lastName} onChange={e => setForm((f: any) => ({ ...f, lastName: e.target.value }))}
+                  className={inputCls} placeholder="Иванов" />
+              </F>
+              <F label="Email">
+                <input type="email" value={form.email} onChange={e => setForm((f: any) => ({ ...f, email: e.target.value }))}
+                  className={inputCls} placeholder="ivan@example.com" />
+              </F>
+              <F label="Телефон">
+                <input value={form.phone} onChange={e => setForm((f: any) => ({ ...f, phone: e.target.value }))}
+                  className={inputCls} placeholder="+7 (999) 000-00-00" />
+              </F>
+              <F label="Город">
+                <input value={form.city} onChange={e => setForm((f: any) => ({ ...f, city: e.target.value }))}
+                  className={inputCls} placeholder="Москва" />
+              </F>
+              <F label="Источник">
+                <select value={form.source} onChange={e => setForm((f: any) => ({ ...f, source: e.target.value }))} className={inputCls}>
+                  {SOURCES.map(s => <option key={s} value={s}>{SOURCE_LABELS[s]}</option>)}
+                </select>
+              </F>
+            </div>
+            <F label="Заметки">
+              <textarea value={form.notes} onChange={e => setForm((f: any) => ({ ...f, notes: e.target.value }))}
+                className={inputCls + ' resize-none'} rows={2} placeholder="Заметки о клиенте..." />
+            </F>
+          </div>
           <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
             <button onClick={() => { setCreating(false); setEditing(null); }}
               className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium">Отмена</button>

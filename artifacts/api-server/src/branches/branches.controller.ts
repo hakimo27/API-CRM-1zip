@@ -13,6 +13,12 @@ export class BranchesController {
     return this.branchesService.findAll();
   }
 
+  @Public()
+  @Get("pickup-points")
+  findPickupPoints() {
+    return this.branchesService.findPickupPoints();
+  }
+
   @Get("admin")
   @Roles("admin", "manager")
   findAllAdmin() {

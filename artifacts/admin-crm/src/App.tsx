@@ -20,6 +20,7 @@ import SaleProductsPage from '@/pages/SaleProductsPage';
 import ContentPage from '@/pages/ContentPage';
 import LogsPage from '@/pages/LogsPage';
 import MediaPage from '@/pages/MediaPage';
+import NotFoundPage from '@/pages/NotFoundPage';
 import { useEffect } from 'react';
 
 const queryClient = new QueryClient({
@@ -70,6 +71,7 @@ function CrmRoutes() {
       <Route path="/settings"><G><SettingsPage /></G></Route>
       <Route path="/logs"><G><LogsPage /></G></Route>
       <Route path="/media"><G><MediaPage /></G></Route>
+      <Route><G><NotFoundPage /></G></Route>
     </Switch>
   );
 }

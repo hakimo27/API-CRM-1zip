@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   Inject,
+  Logger,
 } from "@nestjs/common";
 import { eq, desc, and, or, like, inArray } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
@@ -20,22 +21,37 @@ import { generateOrderNumber } from "@workspace/shared";
 
 type DrizzleDb = typeof import("@workspace/db").db;
 
+export interface CreateOrderItemDto {
+  productId: number;
+  quantity: number;
+  startDate?: string;
+  endDate?: string;
+  tariffId?: number;
+  pricePerDay?: number;
+  totalPrice?: number;
+}
+
 export interface CreateOrderDto {
   customerName: string;
   customerPhone: string;
   customerEmail?: string;
   communicationChannel?: string;
-  startDate: string;
-  endDate: string;
-  items: Array<{ productId: number; quantity: number }>;
+  startDate?: string;
+  endDate?: string;
+  items: CreateOrderItemDto[];
   notes?: string;
   depositPaid?: boolean;
   branchId?: number;
+  deliveryType?: string;
+  deliveryAddress?: string;
   promoCode?: string;
+  totalAmount?: number;
 }
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     @Inject(DB_TOKEN) private db: DrizzleDb,
     private availabilityService: AvailabilityService,
@@ -131,29 +147,74 @@ export class OrdersService {
     };
   }
 
-  async create(dto: CreateOrderDto) {
-    const startDate = new Date(dto.startDate);
-    const endDate = new Date(dto.endDate);
+  private parseDate(dateStr: string | undefined, fieldName: string): Date | null {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) {
+      this.logger.warn(`Invalid date for ${fieldName}: "${dateStr}"`);
+      return null;
+    }
+    return d;
+  }
 
-    if (endDate <= startDate) {
+  async create(dto: CreateOrderDto) {
+    this.logger.log(`Creating order for ${dto.customerPhone}, items: ${dto.items.length}`);
+
+    // Derive order-level dates: use dto.startDate/endDate if provided,
+    // otherwise derive from item-level dates (min start, max end)
+    let startDate: Date | null = this.parseDate(dto.startDate, "startDate");
+    let endDate: Date | null = this.parseDate(dto.endDate, "endDate");
+
+    if (!startDate || !endDate) {
+      const itemDates = dto.items
+        .map(item => ({
+          start: this.parseDate(item.startDate, "item.startDate"),
+          end: this.parseDate(item.endDate, "item.endDate"),
+        }))
+        .filter(d => d.start && d.end);
+
+      if (itemDates.length > 0) {
+        startDate = itemDates.reduce((min, d) => d.start! < min ? d.start! : min, itemDates[0].start!);
+        endDate = itemDates.reduce((max, d) => d.end! > max ? d.end! : max, itemDates[0].end!);
+      }
+    }
+
+    // If still no dates, create an open-ended order (e.g., fixed sale without rental period)
+    const hasRentalDates = startDate && endDate;
+
+    if (hasRentalDates && endDate! <= startDate!) {
       throw new BadRequestException("Дата окончания должна быть позже даты начала");
     }
 
-    const availability = await this.availabilityService.checkMultipleProducts(
-      dto.items,
-      startDate,
-      endDate
-    );
-
-    if (!availability.allAvailable) {
-      const unavailable = availability.items.filter((i) => !i.available);
-      throw new BadRequestException(
-        `Недостаточно единиц для аренды: ${unavailable.map((i) => `ID ${i.productId}`).join(", ")}`
+    // Only check availability if we have rental dates
+    if (hasRentalDates) {
+      const availability = await this.availabilityService.checkMultipleProducts(
+        dto.items,
+        startDate!,
+        endDate!
       );
+
+      if (!availability.allAvailable) {
+        const unavailable = availability.items.filter((i: any) => !i.available);
+        throw new BadRequestException(
+          `Недостаточно единиц для аренды: ${unavailable.map((i: any) => `ID ${i.productId}`).join(", ")}`
+        );
+      }
     }
 
-    const pricing = await this.pricingService.calculateProductsPrice(dto.items, startDate, endDate);
+    // Use pre-calculated total from checkout, or calculate if not provided
+    let finalTotalAmount: number;
+    if (dto.totalAmount && dto.totalAmount > 0) {
+      finalTotalAmount = dto.totalAmount;
+    } else if (hasRentalDates) {
+      const pricing = await this.pricingService.calculateProductsPrice(dto.items, startDate!, endDate!);
+      finalTotalAmount = pricing.totalPrice;
+    } else {
+      // Sum from item-level totalPrice if available
+      finalTotalAmount = dto.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+    }
 
+    // Customer upsert
     let customerId: number;
     const existingCustomers = await this.db
       .select()
@@ -185,39 +246,66 @@ export class OrdersService {
 
     const orderNumber = generateOrderNumber();
 
+    const orderValues: any = {
+      orderNumber,
+      customerId,
+      status: "new",
+      totalAmount: String(finalTotalAmount),
+      notes: dto.notes,
+      depositPaid: dto.depositPaid ?? false,
+    };
+
+    if (startDate) orderValues.startDate = startDate;
+    if (endDate) orderValues.endDate = endDate;
+
     const [order] = await this.db
       .insert(ordersTable)
-      .values({
-        orderNumber,
-        customerId,
-        status: "new",
-        totalAmount: String(pricing.totalPrice),
-        startDate,
-        endDate,
-        notes: dto.notes,
-        depositPaid: dto.depositPaid ?? false,
-      })
+      .values(orderValues)
       .returning();
 
     if (!order) throw new BadRequestException("Ошибка создания заказа");
 
-    for (const { productId, quantity } of dto.items) {
-      const availableUnits = await this.availabilityService.getAvailableUnits(productId, startDate, endDate);
-      const pricingItem = pricing.items.find((p) => p.productId === productId);
-      const unitsToAssign = availableUnits.slice(0, quantity);
+    for (const orderItem of dto.items) {
+      const { productId, quantity } = orderItem;
 
-      for (const unit of unitsToAssign) {
-        await this.db.insert(orderItemsTable).values({
-          orderId: order.id,
-          productId,
-          inventoryUnitId: unit.id,
-          quantity: 1,
-          startDate,
-          endDate,
-          pricePerDay: String(pricingItem?.basePrice || 0),
-          totalPrice: String(pricingItem?.basePrice || 0),
-        });
+      // Use item-level dates if available, otherwise use order-level dates
+      const itemStartDate = this.parseDate(orderItem.startDate, "item.startDate") || startDate;
+      const itemEndDate = this.parseDate(orderItem.endDate, "item.endDate") || endDate;
+
+      const itemValues: any = {
+        orderId: order.id,
+        productId,
+        quantity: quantity || 1,
+        pricePerDay: String(orderItem.pricePerDay || 0),
+        totalPrice: String(orderItem.totalPrice || 0),
+      };
+
+      if (itemStartDate) itemValues.startDate = itemStartDate;
+      if (itemEndDate) itemValues.endDate = itemEndDate;
+
+      // Try to assign available units for inventory tracking
+      if (itemStartDate && itemEndDate) {
+        try {
+          const availableUnits = await this.availabilityService.getAvailableUnits(productId, itemStartDate, itemEndDate);
+          const unitsToAssign = availableUnits.slice(0, quantity);
+
+          if (unitsToAssign.length > 0) {
+            for (const unit of unitsToAssign) {
+              await this.db.insert(orderItemsTable).values({
+                ...itemValues,
+                inventoryUnitId: unit.id,
+                quantity: 1,
+              });
+            }
+            continue;
+          }
+        } catch (e) {
+          this.logger.warn(`Could not assign inventory units for product ${productId}: ${e}`);
+        }
       }
+
+      // Fallback: insert without unit assignment
+      await this.db.insert(orderItemsTable).values(itemValues);
     }
 
     await this.db.insert(orderStatusHistoryTable).values({
@@ -226,6 +314,7 @@ export class OrdersService {
       comment: "Заказ создан",
     });
 
+    this.logger.log(`Order ${orderNumber} created successfully`);
     return this.findByNumber(orderNumber);
   }
 

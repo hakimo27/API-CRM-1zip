@@ -117,6 +117,12 @@ Sidebar has 8 grouped sections:
 - **Media uploads**: local storage at `UPLOADS_DIR` (default: `./uploads`), public via `PUBLIC_UPLOADS_URL`. Max 50MB per file. In docker: `/app/uploads` volume.
 - **Static routes before param routes**: NestJS route ordering — always define `GET /resource/admin` BEFORE `GET /resource/:slug` or it will be captured as a slug
 - **Tour dates filter**: gte with Date objects causes "Invalid time value" errors — filter JS-side instead
+- **Focus bug fix pattern**: Inner form components defined as arrow functions inside parent component functions cause React to re-mount on every state change → losing focus on each keystroke. Fix: move helper components (`F`, `Field`, etc.) to module level, inline form JSX directly inside Modal body instead of `<InnerForm />`.
+- **ImageUpload component**: `artifacts/admin-crm/src/components/ImageUpload.tsx` — takes `images: string[]` + `onChange`, uploads via `POST /media/upload?folder=xxx`, supports cover (first = main), reorder (left/right), delete. Used in SaleProductsPage and ProductsPage.
+- **Product images API**: `PATCH /products/:id/images` with `{ urls: string[] }` — syncs the `productImagesTable` (full replace). Must be declared BEFORE `PATCH /products/:id` in the controller.
+- **Sale product images**: stored as `images: jsonb string[]` in `saleProductsTable` — just PATCH the product with updated images array.
+- **Branches extended schema**: `emails` (jsonb string[]), `workingHours` (jsonb `{schedule: string}`), `lat`/`lng` (numeric), `sortOrder` (int), `useForPickup` (bool) — all in DB.
+- **Contacts page pickup points**: Branches with `useForPickup: true` are highlighted and grouped first on the public contacts page (`/info/contacts`). Working hours parsed from `{schedule: string}` format.
 
 ## Test Credentials
 

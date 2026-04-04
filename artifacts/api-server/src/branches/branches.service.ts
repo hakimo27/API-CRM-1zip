@@ -13,6 +13,14 @@ export class BranchesService {
     return this.db.select().from(branchesTable).where(eq(branchesTable.active, true)).orderBy(asc(branchesTable.sortOrder));
   }
 
+  async findPickupPoints() {
+    const branches = await this.db.select().from(branchesTable).orderBy(asc(branchesTable.sortOrder));
+    // Return branches that are active and either useForPickup=true or all if none have useForPickup set
+    const active = branches.filter(b => b.active);
+    const pickupOnly = active.filter((b: any) => b.useForPickup);
+    return pickupOnly.length > 0 ? pickupOnly : active;
+  }
+
   async findAllAdmin() {
     return this.db.select().from(branchesTable).orderBy(asc(branchesTable.sortOrder));
   }

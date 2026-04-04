@@ -51,7 +51,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
 
             {/* Desktop nav */}
             <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
-              <Link href="/catalog" className="text-gray-700 hover:text-blue-600 transition-colors">Каталог</Link>
+              <Link href="/catalog" className="text-gray-700 hover:text-blue-600 transition-colors">Аренда</Link>
+              <Link href="/sale" className="text-gray-700 hover:text-blue-600 transition-colors">Продажа</Link>
               <Link href="/tours" className="text-gray-700 hover:text-blue-600 transition-colors">Туры</Link>
               <Link href="/info/about" className="text-gray-700 hover:text-blue-600 transition-colors">О нас</Link>
               <Link href="/info/contacts" className="text-gray-700 hover:text-blue-600 transition-colors">Контакты</Link>
@@ -114,7 +115,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         {/* Mobile menu */}
         {menuOpen && (
           <div className="md:hidden border-t border-gray-100 bg-white px-4 py-4 space-y-1">
-            <Link href="/catalog" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-2 px-2 rounded-lg hover:bg-gray-50">Каталог</Link>
+            <Link href="/catalog" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-2 px-2 rounded-lg hover:bg-gray-50">Аренда</Link>
+            <Link href="/sale" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-2 px-2 rounded-lg hover:bg-gray-50">Продажа</Link>
             <Link href="/tours" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-2 px-2 rounded-lg hover:bg-gray-50">Туры</Link>
             <Link href="/info/about" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-2 px-2 rounded-lg hover:bg-gray-50">О нас</Link>
             <Link href="/info/contacts" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-2 px-2 rounded-lg hover:bg-gray-50">Контакты</Link>
@@ -150,11 +152,12 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
 
             {/* Catalog */}
             <div>
-              <h3 className="font-semibold text-white mb-3">Каталог</h3>
+              <h3 className="font-semibold text-white mb-3">Снаряжение</h3>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/catalog?category=kayaks" className="hover:text-white transition-colors">Байдарки</Link></li>
-                <li><Link href="/catalog?category=canoes" className="hover:text-white transition-colors">Каноэ</Link></li>
-                <li><Link href="/catalog?category=sup" className="hover:text-white transition-colors">SUP-доски</Link></li>
+                <li><Link href="/catalog?category=kayaks" className="hover:text-white transition-colors">Аренда байдарок</Link></li>
+                <li><Link href="/catalog?category=canoes" className="hover:text-white transition-colors">Аренда каноэ</Link></li>
+                <li><Link href="/catalog?category=sup" className="hover:text-white transition-colors">Аренда SUP-досок</Link></li>
+                <li><Link href="/sale" className="hover:text-white transition-colors">Продажа снаряжения</Link></li>
                 <li><Link href="/tours" className="hover:text-white transition-colors">Туры и рафтинг</Link></li>
               </ul>
             </div>

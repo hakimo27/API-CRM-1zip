@@ -125,6 +125,17 @@ export class ProductsService {
     return { message: "Товар удалён" };
   }
 
+  async syncImages(productId: number, urls: string[]) {
+    await this.findById(productId);
+    await this.db.delete(productImagesTable).where(eq(productImagesTable.productId, productId));
+    if (urls.length > 0) {
+      await this.db.insert(productImagesTable).values(
+        urls.map((url: string, idx: number) => ({ productId, url, alt: null, sortOrder: idx }))
+      );
+    }
+    return { message: "Изображения обновлены" };
+  }
+
   async updateStock(productId: number, delta: number) {
     const [product] = await this.db.select().from(productsTable).where(eq(productsTable.id, productId)).limit(1);
     if (!product) throw new NotFoundException("Товар не найден");

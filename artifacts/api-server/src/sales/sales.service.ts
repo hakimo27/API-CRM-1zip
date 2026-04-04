@@ -42,6 +42,16 @@ export class SalesService {
     return product;
   }
 
+  async findProductBySlug(slug: string) {
+    const [product] = await this.db
+      .select()
+      .from(saleProductsTable)
+      .where(eq(saleProductsTable.slug, slug))
+      .limit(1);
+    if (!product) throw new NotFoundException("Товар не найден");
+    return product;
+  }
+
   async createProduct(data: typeof saleProductsTable.$inferInsert) {
     const [created] = await this.db.insert(saleProductsTable).values(data).returning();
     return created;
