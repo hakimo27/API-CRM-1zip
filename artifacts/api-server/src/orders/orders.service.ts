@@ -456,6 +456,125 @@ export class OrdersService {
     return this.findByNumber(order.orderNumber!);
   }
 
+  async findById(id: number) {
+    const [order] = await this.db.select().from(ordersTable).where(eq(ordersTable.id, id)).limit(1);
+    if (!order) throw new NotFoundException("Заказ не найден");
+
+    const [customer, items, statusHistory] = await Promise.all([
+      order.customerId
+        ? this.db.select().from(customersTable).where(eq(customersTable.id, order.customerId)).limit(1)
+        : Promise.resolve([]),
+      this.db
+        .select({ item: orderItemsTable, product: productsTable })
+        .from(orderItemsTable)
+        .leftJoin(productsTable, eq(orderItemsTable.productId, productsTable.id))
+        .where(eq(orderItemsTable.orderId, order.id)),
+      this.db
+        .select()
+        .from(orderStatusHistoryTable)
+        .where(eq(orderStatusHistoryTable.orderId, order.id))
+        .orderBy(desc(orderStatusHistoryTable.changedAt)),
+    ]);
+
+    return {
+      ...order,
+      customer: (customer as any[])[0] || null,
+      items: items.map(({ item, product }) => ({
+        ...item,
+        productName: product?.name,
+        product,
+      })),
+      statusHistory,
+    };
+  }
+
+  async addItem(orderId: number, itemData: {
+    productId: number;
+    quantity: number;
+    pricePerDay?: number;
+    totalPrice?: number;
+  }) {
+    const [order] = await this.db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
+    if (!order) throw new NotFoundException("Заказ не найден");
+
+    const [product] = await this.db.select().from(productsTable).where(eq(productsTable.id, itemData.productId)).limit(1);
+    if (!product) throw new NotFoundException("Товар не найден");
+
+    await this.db.insert(orderItemsTable).values({
+      orderId,
+      productId: itemData.productId,
+      quantity: itemData.quantity,
+      startDate: order.startDate ? new Date(order.startDate as string) : undefined,
+      endDate: order.endDate ? new Date(order.endDate as string) : undefined,
+      pricePerDay: itemData.pricePerDay !== undefined ? String(itemData.pricePerDay) : undefined,
+      totalPrice: itemData.totalPrice !== undefined ? String(itemData.totalPrice) : undefined,
+    });
+
+    await this.recalculateOrderTotal(orderId);
+
+    await this.db.insert(orderStatusHistoryTable).values({
+      orderId,
+      status: order.status as any,
+      comment: `Добавлен товар: ${product.name} x${itemData.quantity}`,
+    });
+
+    return this.findById(orderId);
+  }
+
+  async updateItem(orderId: number, itemId: number, data: {
+    quantity?: number;
+    pricePerDay?: number;
+    totalPrice?: number;
+  }) {
+    const [item] = await this.db.select().from(orderItemsTable)
+      .where(and(eq(orderItemsTable.id, itemId), eq(orderItemsTable.orderId, orderId)))
+      .limit(1);
+    if (!item) throw new NotFoundException("Позиция заказа не найдена");
+
+    const updateData: any = {};
+    if (data.quantity !== undefined) updateData.quantity = data.quantity;
+    if (data.pricePerDay !== undefined) updateData.pricePerDay = String(data.pricePerDay);
+    if (data.totalPrice !== undefined) updateData.totalPrice = String(data.totalPrice);
+
+    await this.db.update(orderItemsTable).set(updateData).where(eq(orderItemsTable.id, itemId));
+
+    await this.recalculateOrderTotal(orderId);
+
+    return this.findById(orderId);
+  }
+
+  async removeItem(orderId: number, itemId: number) {
+    const [item] = await this.db.select().from(orderItemsTable)
+      .where(and(eq(orderItemsTable.id, itemId), eq(orderItemsTable.orderId, orderId)))
+      .limit(1);
+    if (!item) throw new NotFoundException("Позиция заказа не найдена");
+
+    const [order] = await this.db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
+    const [product] = await this.db.select().from(productsTable).where(eq(productsTable.id, item.productId!)).limit(1);
+
+    await this.db.delete(orderItemsTable).where(eq(orderItemsTable.id, itemId));
+
+    await this.recalculateOrderTotal(orderId);
+
+    if (order) {
+      await this.db.insert(orderStatusHistoryTable).values({
+        orderId,
+        status: order.status as any,
+        comment: `Удалён товар: ${product?.name || `#${item.productId}`}`,
+      });
+    }
+
+    return this.findById(orderId);
+  }
+
+  private async recalculateOrderTotal(orderId: number) {
+    const items = await this.db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId));
+    const total = items.reduce((sum, item) => sum + parseFloat((item.totalPrice as string) || "0"), 0);
+    if (total > 0) {
+      await this.db.update(ordersTable).set({ totalAmount: String(total) } as any).where(eq(ordersTable.id, orderId));
+    }
+  }
+
   async getStats() {
     const all = await this.db.select().from(ordersTable);
     const stats = {

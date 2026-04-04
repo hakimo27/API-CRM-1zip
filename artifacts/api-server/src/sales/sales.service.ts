@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, Inject } from "@nestjs/common";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray, and } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
 import {
   saleOrdersTable,
@@ -103,6 +103,36 @@ export class SalesService {
     }));
   }
 
+  async findOrderById(id: number) {
+    const [order] = await this.db
+      .select()
+      .from(saleOrdersTable)
+      .where(eq(saleOrdersTable.id, id))
+      .limit(1);
+    if (!order) throw new NotFoundException("Заказ не найден");
+
+    const items = await this.db
+      .select({ item: saleOrderItemsTable, product: saleProductsTable })
+      .from(saleOrderItemsTable)
+      .leftJoin(saleProductsTable, eq(saleOrderItemsTable.productId, saleProductsTable.id))
+      .where(eq(saleOrderItemsTable.orderId, id));
+
+    return {
+      ...order,
+      items: items.map(({ item, product }) => ({ ...item, product })),
+    };
+  }
+
+  async updateOrder(id: number, data: any) {
+    const [updated] = await this.db
+      .update(saleOrdersTable)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(saleOrdersTable.id, id))
+      .returning();
+    if (!updated) throw new NotFoundException("Заказ не найден");
+    return this.findOrderById(id);
+  }
+
   async createOrder(data: {
     customerName: string;
     customerPhone: string;
@@ -169,7 +199,72 @@ export class SalesService {
       });
     }
 
-    return order;
+    return this.findOrderById(order.id);
+  }
+
+  async addOrderItem(orderId: number, data: { productId: number; quantity: number; price?: number }) {
+    const [order] = await this.db.select().from(saleOrdersTable).where(eq(saleOrdersTable.id, orderId)).limit(1);
+    if (!order) throw new NotFoundException("Заказ не найден");
+
+    const [product] = await this.db.select().from(saleProductsTable).where(eq(saleProductsTable.id, data.productId)).limit(1);
+    if (!product) throw new NotFoundException("Товар не найден");
+
+    const unitPrice = data.price !== undefined ? data.price : parseFloat(product.price as string);
+
+    await this.db.insert(saleOrderItemsTable).values({
+      orderId,
+      productId: data.productId,
+      quantity: data.quantity,
+      price: String(unitPrice),
+      name: product.name,
+    });
+
+    await this.recalculateOrderTotal(orderId);
+
+    return this.findOrderById(orderId);
+  }
+
+  async updateOrderItem(orderId: number, itemId: number, data: { quantity?: number; price?: number }) {
+    const [item] = await this.db
+      .select()
+      .from(saleOrderItemsTable)
+      .where(and(eq(saleOrderItemsTable.id, itemId), eq(saleOrderItemsTable.orderId, orderId)))
+      .limit(1);
+    if (!item) throw new NotFoundException("Позиция заказа не найдена");
+
+    const updateData: any = {};
+    if (data.quantity !== undefined) updateData.quantity = data.quantity;
+    if (data.price !== undefined) updateData.price = String(data.price);
+
+    await this.db.update(saleOrderItemsTable).set(updateData).where(eq(saleOrderItemsTable.id, itemId));
+
+    await this.recalculateOrderTotal(orderId);
+
+    return this.findOrderById(orderId);
+  }
+
+  async removeOrderItem(orderId: number, itemId: number) {
+    const [item] = await this.db
+      .select()
+      .from(saleOrderItemsTable)
+      .where(and(eq(saleOrderItemsTable.id, itemId), eq(saleOrderItemsTable.orderId, orderId)))
+      .limit(1);
+    if (!item) throw new NotFoundException("Позиция заказа не найдена");
+
+    await this.db.delete(saleOrderItemsTable).where(eq(saleOrderItemsTable.id, itemId));
+
+    await this.recalculateOrderTotal(orderId);
+
+    return this.findOrderById(orderId);
+  }
+
+  private async recalculateOrderTotal(orderId: number) {
+    const items = await this.db.select().from(saleOrderItemsTable).where(eq(saleOrderItemsTable.orderId, orderId));
+    const total = items.reduce((sum, item) => {
+      const price = parseFloat((item.price as string) || "0");
+      return sum + price * (item.quantity || 1);
+    }, 0);
+    await this.db.update(saleOrdersTable).set({ totalAmount: String(total) }).where(eq(saleOrdersTable.id, orderId));
   }
 
   async updateOrderStatus(id: number, status: string) {
@@ -179,7 +274,7 @@ export class SalesService {
       .where(eq(saleOrdersTable.id, id))
       .returning();
     if (!updated) throw new NotFoundException("Заказ не найден");
-    return updated;
+    return this.findOrderById(id);
   }
 
   async getStats() {

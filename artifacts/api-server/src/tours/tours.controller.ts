@@ -100,6 +100,12 @@ export class ToursController {
     return this.toursService.deleteDate(dateId);
   }
 
+  @Get("bookings/:id")
+  @Roles("admin", "manager", "instructor", "superadmin")
+  getBookingById(@Param("id", ParseIntPipe) id: number) {
+    return this.toursService.findBookingById(id);
+  }
+
   @Patch("bookings/:bookingId")
   @Roles("admin", "manager", "superadmin")
   updateBooking(@Param("bookingId", ParseIntPipe) bookingId: number, @Body() body: any) {

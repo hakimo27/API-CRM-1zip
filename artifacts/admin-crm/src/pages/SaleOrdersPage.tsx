@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Link, useLocation } from 'wouter';
-import { Search, RefreshCw, ChevronRight, Plus, X, Loader2 } from 'lucide-react';
+import { Search, RefreshCw, ChevronRight, Plus, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -156,7 +156,10 @@ export default function SaleOrdersPage() {
                       {new Date(order.createdAt).toLocaleDateString('ru-RU')}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <span className="text-xs text-gray-300 italic">#{order.id}</span>
+                      <Link href={`/sale-orders/${order.id}`}
+                        className="p-2 inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors">
+                        Открыть <ChevronRight className="w-3.5 h-3.5" />
+                      </Link>
                     </td>
                   </tr>
                 ))}

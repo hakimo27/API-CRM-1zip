@@ -59,6 +59,12 @@ export class SalesController {
     return this.salesService.getStats();
   }
 
+  @Get("orders/:id")
+  @Roles("admin", "manager")
+  getOrderById(@Param("id", ParseIntPipe) id: number) {
+    return this.salesService.findOrderById(id);
+  }
+
   @Public()
   @Post("orders")
   createOrder(@Body() body: any) {
@@ -72,5 +78,39 @@ export class SalesController {
     @Body() body: { status: string }
   ) {
     return this.salesService.updateOrderStatus(id, body.status);
+  }
+
+  @Patch("orders/:id")
+  @Roles("admin", "manager")
+  updateOrder(@Param("id", ParseIntPipe) id: number, @Body() body: any) {
+    return this.salesService.updateOrder(id, body);
+  }
+
+  @Post("orders/:id/items")
+  @Roles("admin", "manager")
+  addOrderItem(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() body: { productId: number; quantity: number; price?: number }
+  ) {
+    return this.salesService.addOrderItem(id, body);
+  }
+
+  @Patch("orders/:id/items/:itemId")
+  @Roles("admin", "manager")
+  updateOrderItem(
+    @Param("id", ParseIntPipe) id: number,
+    @Param("itemId", ParseIntPipe) itemId: number,
+    @Body() body: { quantity?: number; price?: number }
+  ) {
+    return this.salesService.updateOrderItem(id, itemId, body);
+  }
+
+  @Delete("orders/:id/items/:itemId")
+  @Roles("admin", "manager")
+  removeOrderItem(
+    @Param("id", ParseIntPipe) id: number,
+    @Param("itemId", ParseIntPipe) itemId: number
+  ) {
+    return this.salesService.removeOrderItem(id, itemId);
   }
 }

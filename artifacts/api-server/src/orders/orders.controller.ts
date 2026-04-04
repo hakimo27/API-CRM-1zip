@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query } from "@nestjs/common";
+import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Query } from "@nestjs/common";
 import { OrdersService } from "./orders.service.js";
 import { Public } from "../common/decorators/public.decorator.js";
 import { Roles } from "../common/decorators/roles.decorator.js";
@@ -35,6 +35,12 @@ export class OrdersController {
     return this.ordersService.findAll({ userId: user.id });
   }
 
+  @Get("by-id/:id")
+  @Roles("admin", "manager")
+  findById(@Param("id", ParseIntPipe) id: number) {
+    return this.ordersService.findById(id);
+  }
+
   @Public()
   @Get(":number")
   findOne(@Param("number") number: string) {
@@ -64,6 +70,34 @@ export class OrdersController {
     @CurrentUser() user: any
   ) {
     return this.ordersService.updateStatus(id, body.status, body.comment, user?.id);
+  }
+
+  @Post(":id/items")
+  @Roles("admin", "manager")
+  addItem(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() body: { productId: number; quantity: number; pricePerDay?: number; totalPrice?: number }
+  ) {
+    return this.ordersService.addItem(id, body);
+  }
+
+  @Patch(":id/items/:itemId")
+  @Roles("admin", "manager")
+  updateItem(
+    @Param("id", ParseIntPipe) id: number,
+    @Param("itemId", ParseIntPipe) itemId: number,
+    @Body() body: { quantity?: number; pricePerDay?: number; totalPrice?: number }
+  ) {
+    return this.ordersService.updateItem(id, itemId, body);
+  }
+
+  @Delete(":id/items/:itemId")
+  @Roles("admin", "manager")
+  removeItem(
+    @Param("id", ParseIntPipe) id: number,
+    @Param("itemId", ParseIntPipe) itemId: number
+  ) {
+    return this.ordersService.removeItem(id, itemId);
   }
 
   @Patch(":id")

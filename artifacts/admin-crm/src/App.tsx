@@ -11,6 +11,8 @@ import CreateRentalOrderPage from '@/pages/CreateRentalOrderPage';
 import SaleOrdersPage from '@/pages/SaleOrdersPage';
 import CreateSaleOrderPage from '@/pages/CreateSaleOrderPage';
 import TourBookingsPage from '@/pages/TourBookingsPage';
+import SaleOrderDetailPage from '@/pages/SaleOrderDetailPage';
+import TourBookingDetailPage from '@/pages/TourBookingDetailPage';
 import InventoryPage from '@/pages/InventoryPage';
 import ProductsPage from '@/pages/ProductsPage';
 import CustomersPage from '@/pages/CustomersPage';
@@ -66,9 +68,11 @@ function CrmRoutes() {
 
       {/* Sale Orders */}
       <Route path="/sale-orders/new"><G><CreateSaleOrderPage /></G></Route>
+      <Route path="/sale-orders/:id">{(p) => <G><SaleOrderDetailPage id={p.id} /></G>}</Route>
       <Route path="/sale-orders"><G><SaleOrdersPage /></G></Route>
 
       {/* Tour Bookings */}
+      <Route path="/tour-bookings/:id">{(p) => <G><TourBookingDetailPage id={p.id} /></G>}</Route>
       <Route path="/tour-bookings"><G><TourBookingsPage /></G></Route>
 
       {/* Catalog */}

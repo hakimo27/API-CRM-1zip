@@ -221,4 +221,18 @@ export class ToursService {
 
     return bookings.map(({ booking, tourDate, tour }) => ({ ...booking, tourDate, tour }));
   }
+
+  async findBookingById(id: number) {
+    const [row] = await this.db
+      .select({ booking: tourBookingsTable, tourDate: tourDatesTable, tour: toursTable })
+      .from(tourBookingsTable)
+      .leftJoin(tourDatesTable, eq(tourBookingsTable.tourDateId, tourDatesTable.id))
+      .leftJoin(toursTable, eq(tourDatesTable.tourId, toursTable.id))
+      .where(eq(tourBookingsTable.id, id))
+      .limit(1);
+
+    if (!row) throw new NotFoundException("Бронирование не найдено");
+
+    return { ...row.booking, tourDate: row.tourDate, tour: row.tour };
+  }
 }

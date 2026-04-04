@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Search, RefreshCw } from 'lucide-react';
+import { Search, RefreshCw, ChevronRight } from 'lucide-react';
+import { Link } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -111,13 +112,14 @@ export default function TourBookingsPage() {
                   <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Сумма</th>
                   <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
                   <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Создано</th>
+                  <th className="px-6 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filtered.map((b: any) => (
-                  <tr key={b.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr key={b.id} className="hover:bg-gray-50/50 transition-colors cursor-pointer">
                     <td className="px-6 py-4">
-                      <div className="font-medium text-sm text-gray-900">{b.tour?.name || b.tourName || '—'}</div>
+                      <Link href={`/tour-bookings/${b.id}`} className="font-medium text-sm text-blue-700 hover:underline">{b.tour?.name || b.tourName || '—'}</Link>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
                       {b.tourDate?.startDate
@@ -147,6 +149,12 @@ export default function TourBookingsPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
                       {new Date(b.createdAt).toLocaleDateString('ru-RU')}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <Link href={`/tour-bookings/${b.id}`}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors">
+                        Открыть <ChevronRight className="w-3.5 h-3.5" />
+                      </Link>
                     </td>
                   </tr>
                 ))}
