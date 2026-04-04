@@ -1,0 +1,20 @@
+{
+  "name": "КаякРент CRM",
+  "short_name": "CRM",
+  "description": "Панель управления прокатом водного снаряжения",
+  "start_url": "/crm/",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/crm/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "ru"
+}

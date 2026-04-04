@@ -1,7 +1,7 @@
 import { Injectable, Inject } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
-import { tariffsTable } from "@workspace/db";
+import { tariffsTable, productsTable } from "@workspace/db";
 import type { TariffType, PricingResult } from "@workspace/shared";
 
 type DrizzleDb = typeof import("@workspace/db").db;
@@ -34,17 +34,24 @@ export class PricingService {
       (new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)
     ));
 
-    const tariffs = await this.db
-      .select()
-      .from(tariffsTable)
-      .where(eq(tariffsTable.productId, productId));
+    const [tariffs, product] = await Promise.all([
+      this.db.select().from(tariffsTable).where(eq(tariffsTable.productId, productId)),
+      this.db.select({ depositAmount: productsTable.depositAmount })
+        .from(productsTable)
+        .where(eq(productsTable.id, productId))
+        .limit(1),
+    ]);
 
     const tariff = tariffs.find((t) => t.tariffType === tariffType)
       || tariffs.find((t) => t.tariffType === "weekday")
       || tariffs[0];
 
+    const deposit = product[0]?.depositAmount
+      ? parseFloat(product[0].depositAmount as string)
+      : 0;
+
     if (!tariff) {
-      return { basePrice: 0, totalPrice: 0, days, tariffType, deposit: 0 };
+      return { basePrice: 0, totalPrice: 0, days, tariffType, deposit };
     }
 
     const basePrice = parseFloat(tariff.pricePerDay as string);
@@ -55,7 +62,7 @@ export class PricingService {
       totalPrice,
       days,
       tariffType,
-      deposit: 0,
+      deposit,
     };
   }
 
@@ -77,6 +84,7 @@ export class PricingService {
     );
 
     const totalPrice = results.reduce((sum, r) => sum + r.totalPrice, 0);
-    return { items: results, totalPrice };
+    const totalDeposit = results.reduce((sum, r) => sum + r.deposit * r.quantity, 0);
+    return { items: results, totalPrice, totalDeposit };
   }
 }

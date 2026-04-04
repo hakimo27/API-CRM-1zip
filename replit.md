@@ -91,7 +91,7 @@ DELETE /api/sales/products/:id → Delete sale product
 
 ## Public Site Routes (/)
 
-- `/` — Homepage: hero, categories, featured products, reviews, CTA
+- `/` — Homepage: hero, categories, featured products, **tours block**, reviews, CTA
 - `/catalog` — Catalog with category tabs, search, product grid
 - `/catalog/:slug` — Product detail: images, tariffs, date picker, add to cart
 - `/cart` — Cart with items, pricing summary

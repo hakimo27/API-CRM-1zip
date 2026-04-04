@@ -1,7 +1,7 @@
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { ArrowRight, Shield, Clock, MapPin, Star, ChevronRight, Anchor } from 'lucide-react';
+import { ArrowRight, Shield, Clock, MapPin, Star, ChevronRight, Anchor, Waves, Users, Calendar } from 'lucide-react';
 
 interface Product {
   id: number; name: string; slug: string; categoryName: string;
@@ -62,6 +62,62 @@ function ProductCard({ product }: { product: Product }) {
   );
 }
 
+function TourCard({ tour }: { tour: any }) {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow border border-gray-100 overflow-hidden group">
+      <div className="h-44 bg-gradient-to-br from-teal-100 to-green-50 flex items-center justify-center relative">
+        {tour.difficulty && (
+          <span className="absolute top-3 right-3 px-2 py-1 bg-white/80 backdrop-blur text-xs font-medium rounded-full text-gray-700">
+            {tour.difficulty === 'easy' ? 'Лёгкий' : tour.difficulty === 'medium' ? 'Средний' : tour.difficulty === 'hard' ? 'Сложный' : tour.difficulty}
+          </span>
+        )}
+        <span className="text-6xl opacity-60">🚣</span>
+      </div>
+      <div className="p-4">
+        <h3 className="font-semibold text-gray-900 mb-1.5 group-hover:text-blue-700 transition-colors line-clamp-1">
+          {tour.name || tour.title}
+        </h3>
+        {tour.shortDescription && (
+          <p className="text-sm text-gray-500 mb-3 line-clamp-2">{tour.shortDescription}</p>
+        )}
+        <div className="flex flex-wrap gap-3 mb-3 text-xs text-gray-500">
+          {(tour.duration || tour.durationDays) && (
+            <span className="flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5" /> {tour.duration || `${tour.durationDays} дн.`}
+            </span>
+          )}
+          {(tour.maxParticipants || tour.groupSize) && (
+            <span className="flex items-center gap-1">
+              <Users className="w-3.5 h-3.5" /> до {tour.maxParticipants || tour.groupSize} чел.
+            </span>
+          )}
+          {(tour.location || tour.region) && (
+            <span className="flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5" /> {tour.location || tour.region}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center justify-between">
+          {(tour.price || tour.basePrice) ? (
+            <div>
+              <span className="text-xs text-gray-500">от </span>
+              <span className="font-bold text-blue-700 text-sm">
+                {Number(tour.price || tour.basePrice).toLocaleString('ru-RU')} ₽
+              </span>
+            </div>
+          ) : (
+            <span className="text-sm text-gray-400">Цена по запросу</span>
+          )}
+          <Link href={`/tours/${tour.slug}`}
+            className="px-3 py-1.5 bg-teal-600 text-white text-xs font-medium rounded-lg hover:bg-teal-700 transition-colors">
+            Подробнее
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ['products', 'featured'],
@@ -77,6 +133,13 @@ export default function HomePage() {
     queryKey: ['reviews'],
     queryFn: () => api.get('/content/reviews'),
   });
+
+  const { data: tours = [] } = useQuery<any[]>({
+    queryKey: ['tours-public'],
+    queryFn: () => api.get('/tours?active=true&limit=6'),
+  });
+
+  const featuredTours = tours.filter((t: any) => t.featured || t.active !== false).slice(0, 3);
 
   return (
     <div>
@@ -169,6 +232,37 @@ export default function HomePage() {
         </section>
       )}
 
+      {/* Tours block */}
+      {tours.length > 0 && (
+        <section className="py-16 bg-gradient-to-br from-teal-50 to-green-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <div className="inline-flex items-center gap-2 text-teal-600 font-medium text-sm mb-2">
+                  <Waves className="w-4 h-4" /> Водные маршруты
+                </div>
+                <h2 className="text-3xl font-bold text-gray-900">Туры и экспедиции</h2>
+                <p className="text-gray-600 mt-1">Готовые маршруты с опытными инструкторами</p>
+              </div>
+              <Link href="/tours" className="inline-flex items-center gap-1 text-teal-600 font-medium hover:text-teal-700 transition-colors">
+                Все туры <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {(featuredTours.length > 0 ? featuredTours : tours.slice(0, 3)).map((t: any) => (
+                <TourCard key={t.id} tour={t} />
+              ))}
+            </div>
+            <div className="text-center mt-8">
+              <Link href="/tours"
+                className="inline-flex items-center gap-2 px-8 py-3 bg-teal-600 text-white font-semibold rounded-xl hover:bg-teal-700 transition-colors">
+                Смотреть все туры <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Reviews */}
       {reviews.length > 0 && (
         <section className="py-16 bg-gray-50">
@@ -196,10 +290,15 @@ export default function HomePage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Готовы к приключениям?</h2>
           <p className="text-xl text-blue-100 mb-8">Забронируйте снаряжение онлайн за 5 минут и отправляйтесь в путь</p>
-          <Link href="/catalog" className="inline-flex items-center gap-2 px-10 py-4 bg-white text-blue-800 font-bold rounded-xl hover:bg-blue-50 transition-colors text-lg">
-            Выбрать снаряжение
-            <ArrowRight className="w-5 h-5" />
-          </Link>
+          <div className="flex flex-wrap gap-4 justify-center">
+            <Link href="/catalog" className="inline-flex items-center gap-2 px-10 py-4 bg-white text-blue-800 font-bold rounded-xl hover:bg-blue-50 transition-colors text-lg">
+              Выбрать снаряжение
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+            <Link href="/tours" className="inline-flex items-center gap-2 px-10 py-4 bg-white/20 text-white font-bold rounded-xl hover:bg-white/30 transition-colors text-lg border border-white/30">
+              Посмотреть туры
+            </Link>
+          </div>
         </div>
       </section>
     </div>

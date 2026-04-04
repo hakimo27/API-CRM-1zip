@@ -3,10 +3,20 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   LayoutDashboard, ShoppingBag, Package, Users, Tag, MapPin,
   MessageSquare, Settings, LogOut, Menu, X, User, Waves, ChevronRight,
-  Store, FileText, HelpCircle, Star, Bell, Activity, Building2,
+  Store, FileText, HelpCircle, Star, Activity, Building2,
   BookOpen, ScrollText, Image, ShoppingCart, CalendarCheck, Fish,
 } from 'lucide-react';
 import { useState } from 'react';
+
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: 'Супер-администратор',
+  admin: 'Администратор',
+  manager: 'Менеджер',
+  operator: 'Оператор',
+  instructor: 'Инструктор',
+  accountant: 'Бухгалтер',
+  user: 'Пользователь',
+};
 
 const NAV_GROUPS = [
   {
@@ -41,7 +51,7 @@ const NAV_GROUPS = [
     label: 'Клиенты',
     items: [
       { href: '/customers', label: 'Клиенты', icon: Users },
-      { href: '/branches', label: 'Филиалы', icon: Building2 },
+      { href: '/branches', label: 'Филиалы и выдача', icon: Building2 },
     ],
   },
   {
@@ -94,6 +104,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [location] = useLocation();
 
   const currentPage = findCurrentPage(location);
+  const roleLabel = ROLE_LABELS[user?.role || ''] || user?.role || '';
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -136,8 +147,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               {(user?.firstName?.[0] || user?.email?.[0] || '?').toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="font-medium text-gray-900 text-xs truncate">{user?.firstName} {user?.lastName}</div>
-              <div className="text-[10px] text-gray-400 truncate">{user?.role}</div>
+              <div className="font-medium text-gray-900 text-xs truncate">
+                {user?.firstName} {user?.lastName}
+              </div>
+              <div className="text-[10px] text-gray-400 truncate">{roleLabel}</div>
             </div>
           </div>
           <button onClick={logout}
