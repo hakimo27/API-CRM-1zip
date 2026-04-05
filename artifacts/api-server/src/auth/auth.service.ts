@@ -31,6 +31,36 @@ export class AuthService {
     private notificationsService: NotificationsService
   ) {}
 
+  async setupSuperadmin(dto: { email: string; password: string; firstName: string; lastName?: string; phone?: string }) {
+    const existing = await this.db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.role, "superadmin" as any))
+      .limit(1);
+
+    if (existing.length > 0) {
+      return { message: "Superadmin already exists. Skipped.", skipped: true };
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const [user] = await this.db
+      .insert(usersTable)
+      .values({
+        email: dto.email.toLowerCase(),
+        passwordHash,
+        firstName: dto.firstName,
+        lastName: dto.lastName || "",
+        phone: dto.phone || null,
+        role: "superadmin" as any,
+        emailVerifiedAt: new Date(),
+      })
+      .returning();
+
+    if (!user) throw new BadRequestException("Ошибка создания суперадмина");
+    console.log(`[Bootstrap] Superadmin created: ${user.email}`);
+    return { message: "Superadmin created", email: user.email };
+  }
+
   async register(dto: RegisterDto) {
     const existing = await this.db
       .select({ id: usersTable.id })

@@ -83,4 +83,25 @@ export class AuthController {
   health() {
     return { status: "ok", time: new Date().toISOString() };
   }
+
+  /**
+   * One-time bootstrap endpoint. Creates a superadmin if none exists.
+   * Safe to call repeatedly — skips if superadmin already exists.
+   * Only callable when BOOTSTRAP_SUPERADMIN_CREATE=true in env.
+   */
+  @Public()
+  @Post("setup-superadmin")
+  @HttpCode(HttpStatus.OK)
+  setupSuperadmin(@Body() body: any) {
+    if (process.env.BOOTSTRAP_SUPERADMIN_CREATE !== "true") {
+      return { message: "Bootstrap disabled. Set BOOTSTRAP_SUPERADMIN_CREATE=true to enable.", skipped: true };
+    }
+    return this.authService.setupSuperadmin({
+      email: body.email,
+      password: body.password,
+      firstName: body.firstName || "Администратор",
+      lastName: body.lastName,
+      phone: body.phone,
+    });
+  }
 }
