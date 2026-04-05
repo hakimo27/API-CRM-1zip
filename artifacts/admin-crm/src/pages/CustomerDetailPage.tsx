@@ -59,7 +59,7 @@ interface EditableFieldProps {
 function EditableField({ label, value, onSave, type = 'text' }: EditableFieldProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
-  const cls = "text-sm border border-blue-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const cls = "flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
 
   return (
     <div className="flex items-center gap-2 min-h-[28px]">
@@ -69,7 +69,7 @@ function EditableField({ label, value, onSave, type = 'text' }: EditableFieldPro
           {type === 'phone' ? (
             <PhoneInput value={draft} onChange={setDraft} className={cls} />
           ) : (
-            <input type={type} value={draft} onChange={e => setDraft(e.target.value)} className={cls + " flex-1"} />
+            <input type={type} value={draft} onChange={e => setDraft(e.target.value)} className={cls} />
           )}
           <button onClick={() => { onSave(draft); setEditing(false); }} className="p-1 text-green-600 hover:bg-green-50 rounded">
             <Check className="w-4 h-4" />

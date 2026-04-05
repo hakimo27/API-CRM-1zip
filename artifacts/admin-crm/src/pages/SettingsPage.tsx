@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { PhoneInput } from '@/components/PhoneInput';
 import {
   Save, RotateCcw, Eye, EyeOff, Loader2, CheckCircle2, XCircle,
   AlertTriangle, Settings, Phone, Palette, Calendar, Truck,
@@ -311,6 +312,17 @@ function FieldInput({
         placeholder={field.placeholder} rows={3}
         className="w-full max-w-lg px-3 py-2.5 border border-gray-200 rounded-xl text-sm
           focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+    );
+  }
+
+  if (field.type === 'tel') {
+    return (
+      <PhoneInput
+        value={strVal}
+        onChange={v => onChange(v)}
+        placeholder={field.placeholder ?? '+7 (999) 000-00-00'}
+        className="w-full max-w-md px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+      />
     );
   }
 

@@ -10,6 +10,9 @@ interface PhoneInputProps {
   id?: string;
 }
 
+const DEFAULT_CLS =
+  'w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed';
+
 function formatPhoneDigits(raw: string): string {
   const digits = raw.replace(/\D/g, '');
   let d10: string;
@@ -54,7 +57,7 @@ export function PhoneInput({ value, onChange, required, className, placeholder, 
       disabled={disabled}
       id={id}
       placeholder={placeholder ?? '+7 (999) 000-00-00'}
-      className={className}
+      className={className ?? DEFAULT_CLS}
     />
   );
 }

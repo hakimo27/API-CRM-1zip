@@ -127,7 +127,7 @@ export default function SaleCheckoutPage() {
                 </div>
                 <div>
                   <label className={labelCls}>Телефон *</label>
-                  <PhoneInput value={phone} onChange={setPhone} required />
+                  <PhoneInput value={phone} onChange={setPhone} required className={inputCls} />
                 </div>
                 <div>
                   <label className={labelCls}>Email</label>
