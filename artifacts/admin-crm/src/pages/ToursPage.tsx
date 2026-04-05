@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Waves, Clock, Users, Plus, Pencil, Trash2, X, Calendar, BookOpen, Check } from 'lucide-react';
-import { useState } from 'react';
+import { Waves, Users, Plus, Pencil, Trash2, X, Calendar, BookOpen, CheckCircle2, XCircle, Image, Upload } from 'lucide-react';
+import { useState, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 const TYPES = [
@@ -46,11 +46,105 @@ function Field({ label, children, col2 }: { label: string; children: React.React
   );
 }
 
+function TagListEditor({ items, onChange, placeholder, color }: {
+  items: string[]; onChange: (v: string[]) => void; placeholder?: string; color: 'green' | 'red';
+}) {
+  const [input, setInput] = useState('');
+  const add = () => {
+    const v = input.trim();
+    if (v && !items.includes(v)) { onChange([...items, v]); setInput(''); }
+  };
+  const remove = (i: number) => onChange(items.filter((_, idx) => idx !== i));
+  const tagCls = color === 'green'
+    ? 'bg-green-50 text-green-700 border border-green-200'
+    : 'bg-red-50 text-red-700 border border-red-200';
+  const btnCls = color === 'green' ? 'text-green-400 hover:text-green-700' : 'text-red-400 hover:text-red-700';
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <input value={input} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+          className={inputCls + ' flex-1'} placeholder={placeholder} />
+        <button type="button" onClick={add}
+          className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium text-gray-600">
+          <Plus className="w-4 h-4" />
+        </button>
+      </div>
+      {items.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {items.map((item, i) => (
+            <span key={i} className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${tagCls}`}>
+              {item}
+              <button type="button" onClick={() => remove(i)} className={btnCls}>
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PhotoUpload({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/media/upload?folder=tours', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (!res.ok) throw new Error('Ошибка загрузки');
+      const data = await res.json();
+      onChange(data.url);
+    } catch {
+      toast({ title: 'Ошибка загрузки фото', variant: 'destructive' });
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      {value && (
+        <div className="relative w-full h-36 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+          <img src={value} alt="Обложка тура" className="w-full h-full object-cover" />
+          <button type="button" onClick={() => onChange('')}
+            className="absolute top-2 right-2 p-1 bg-white/90 rounded-full text-gray-500 hover:text-red-600 shadow">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+      <div className="flex gap-2">
+        <input type="text" value={value} onChange={e => onChange(e.target.value)}
+          className={inputCls + ' flex-1'} placeholder="https://... или загрузите файл" />
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+          className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm text-gray-600 disabled:opacity-50 whitespace-nowrap">
+          {uploading ? <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" /> : <Upload className="w-4 h-4" />}
+          {uploading ? 'Загрузка...' : 'Загрузить'}
+        </button>
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      </div>
+    </div>
+  );
+}
+
 const emptyTour = {
   title: '', slug: '', type: 'rafting', difficulty: 'medium', region: '',
   duration: 1, minParticipants: 1, maxParticipants: 10,
   basePrice: '', depositAmount: '', description: '', program: '',
-  equipment: '', requirements: '', active: true, featured: false,
+  equipment: '', requirements: '', includes: [] as string[], excludes: [] as string[],
+  mainImage: '', active: true, featured: false,
 };
 
 const emptyDate = {
@@ -142,7 +236,9 @@ export default function ToursPage() {
       region: t.region || '', duration: t.duration, minParticipants: t.minParticipants,
       maxParticipants: t.maxParticipants, basePrice: t.basePrice || '', depositAmount: t.depositAmount || '',
       description: t.description || '', program: t.program || '', equipment: t.equipment || '',
-      requirements: t.requirements || '', active: t.active, featured: t.featured,
+      requirements: t.requirements || '', includes: Array.isArray(t.includes) ? t.includes : [],
+      excludes: Array.isArray(t.excludes) ? t.excludes : [], mainImage: t.mainImage || '',
+      active: t.active, featured: t.featured,
     });
     setEditingTour(t);
   };
@@ -394,7 +490,50 @@ export default function ToursPage() {
                 <textarea value={tourForm.program} onChange={e => setTourForm((f: any) => ({ ...f, program: e.target.value }))}
                   className={inputCls + ' resize-none'} rows={2} placeholder="День 1: ..." />
               </Field>
+              <Field label="Снаряжение" col2>
+                <textarea value={tourForm.equipment} onChange={e => setTourForm((f: any) => ({ ...f, equipment: e.target.value }))}
+                  className={inputCls + ' resize-none'} rows={2} placeholder="Список необходимого снаряжения..." />
+              </Field>
             </div>
+
+            <div className="grid grid-cols-2 gap-4 pt-1">
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  <span className="text-sm font-medium text-gray-700">Включено в тур</span>
+                </div>
+                <TagListEditor
+                  items={tourForm.includes}
+                  onChange={v => setTourForm((f: any) => ({ ...f, includes: v }))}
+                  placeholder="Питание, Трансфер..."
+                  color="green"
+                />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <XCircle className="w-4 h-4 text-red-500" />
+                  <span className="text-sm font-medium text-gray-700">Не включено</span>
+                </div>
+                <TagListEditor
+                  items={tourForm.excludes}
+                  onChange={v => setTourForm((f: any) => ({ ...f, excludes: v }))}
+                  placeholder="Страховка, Перелёт..."
+                  color="red"
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <Image className="w-4 h-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">Фото обложки</span>
+              </div>
+              <PhotoUpload
+                value={tourForm.mainImage}
+                onChange={v => setTourForm((f: any) => ({ ...f, mainImage: v }))}
+              />
+            </div>
+
             <div className="flex gap-6">
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={tourForm.active} onChange={e => setTourForm((f: any) => ({ ...f, active: e.target.checked }))} className="rounded" />
