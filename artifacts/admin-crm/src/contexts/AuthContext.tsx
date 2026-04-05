@@ -13,7 +13,7 @@ interface AuthCtx {
 
 const AuthContext = createContext<AuthCtx | null>(null);
 
-const ALLOWED_ROLES = ['super_admin', 'admin', 'manager', 'operator', 'warehouse'];
+const ALLOWED_ROLES = ['superadmin', 'admin', 'manager', 'warehouse', 'instructor', 'content_manager'];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
