@@ -6,6 +6,9 @@ import cookieParser from "cookie-parser";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter.js";
 import { ResponseInterceptor } from "./common/interceptors/response.interceptor.js";
 import { SocketIoAdapter } from "./chat/socket-io.adapter.js";
+import express from "express";
+import * as path from "path";
+import * as fs from "fs";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -13,6 +16,12 @@ async function bootstrap() {
   });
 
   const port = parseInt(process.env.PORT || "8080", 10);
+  const uploadsDir = path.resolve(process.env.UPLOADS_DIR || "./uploads");
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+  // Serve uploads at /api/uploads (routed through Replit proxy) AND /uploads (direct)
+  app.use("/api/uploads", express.static(uploadsDir));
+  app.use("/uploads", express.static(uploadsDir));
 
   app.setGlobalPrefix("api");
 

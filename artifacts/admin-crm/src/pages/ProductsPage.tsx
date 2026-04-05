@@ -25,6 +25,7 @@ type ProductForm = {
   name: string; slug: string; sku: string; categoryId: string;
   domainScope: string; shortDescription: string; fullDescription: string;
   active: boolean; featured: boolean; depositAmount: string; badge: string;
+  totalStock: string;
   metaTitle: string; metaDescription: string; ogTitle: string; ogDescription: string; canonicalUrl: string;
   tariffs: Tariff[];
   images: string[];
@@ -33,7 +34,7 @@ type ProductForm = {
 const EMPTY_FORM: ProductForm = {
   name: '', slug: '', sku: '', categoryId: '', domainScope: 'rental',
   shortDescription: '', fullDescription: '', active: true, featured: false,
-  depositAmount: '', badge: '',
+  depositAmount: '', badge: '', totalStock: '0',
   metaTitle: '', metaDescription: '', ogTitle: '', ogDescription: '', canonicalUrl: '',
   tariffs: [{ type: 'weekday', label: 'Будни', pricePerDay: '', minDays: '1' }],
   images: [],
@@ -96,6 +97,7 @@ export default function ProductsPage() {
       shortDescription: p.shortDescription || '', fullDescription: p.fullDescription || '',
       active: p.active !== false, featured: !!p.featured,
       depositAmount: String(p.depositAmount || ''), badge: p.badge || '',
+      totalStock: String(p.totalStock ?? 0),
       metaTitle: p.metaTitle || '', metaDescription: p.metaDescription || '',
       ogTitle: p.ogTitle || '', ogDescription: p.ogDescription || '',
       canonicalUrl: p.canonicalUrl || '',
@@ -133,6 +135,7 @@ export default function ProductsPage() {
         active: form.active, featured: form.featured,
         depositAmount: form.depositAmount ? form.depositAmount : undefined,
         badge: form.badge || undefined,
+        totalStock: Number(form.totalStock) || 0,
         metaTitle: form.metaTitle || undefined, metaDescription: form.metaDescription || undefined,
         ogTitle: form.ogTitle || undefined, ogDescription: form.ogDescription || undefined,
         canonicalUrl: form.canonicalUrl || undefined,
@@ -225,6 +228,7 @@ export default function ProductsPage() {
                   <th className="px-6 py-3">Категория</th>
                   <th className="px-6 py-3">Витрина</th>
                   <th className="px-6 py-3">Цена/день</th>
+                  <th className="px-6 py-3">Склад</th>
                   <th className="px-6 py-3">Статус</th>
                   <th className="px-6 py-3 text-right">Действия</th>
                 </tr>
@@ -248,6 +252,12 @@ export default function ProductsPage() {
                       </td>
                       <td className="px-6 py-4 text-sm font-semibold text-gray-900">
                         {minPrice ? `от ${minPrice.toLocaleString('ru-RU')} ₽` : '—'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {(p.totalStock ?? 0) > 0
+                          ? <span className="font-medium text-gray-900">{p.totalStock}</span>
+                          : <span className="text-gray-300">—</span>
+                        }
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${p.active !== false ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
@@ -375,6 +385,15 @@ export default function ProductsPage() {
                       <input type="number" value={form.depositAmount} onChange={e => setField('depositAmount', e.target.value)}
                         className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="5000" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Общий склад (кол-во ед.)
+                        <span className="ml-1 text-gray-400 font-normal">— всего единиц товара</span>
+                      </label>
+                      <input type="number" min="0" value={form.totalStock} onChange={e => setField('totalStock', e.target.value)}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="10" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Бейдж</label>

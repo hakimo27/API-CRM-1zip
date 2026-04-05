@@ -20,6 +20,13 @@ function str(v: unknown, fallback = ''): string {
   return (v && typeof v === 'string' && v.trim()) ? v.trim() : fallback;
 }
 
+function mediaUrl(url: string): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/uploads/')) return url.replace('/uploads/', '/api/uploads/');
+  return url;
+}
+
 function bool(v: unknown, fallback = false): boolean {
   if (v === null || v === undefined) return fallback;
   if (typeof v === 'boolean') return v;
@@ -78,8 +85,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const vkUrl        = str(settings['contacts.vk']);
   const footerText   = str(settings['general.footer_text'], 'Аренда байдарок, каноэ и SUP-досок в Москве и Подмосковье');
   const copyright    = str(settings['general.copyright'], `Байдабаза ${new Date().getFullYear()}`);
-  const logoUrl      = str(settings['branding.logo_url']);
-  const logoLightUrl = str(settings['branding.logo_light_url']);
+  const logoUrl      = mediaUrl(str(settings['branding.logo_url']));
+  const logoLightUrl = mediaUrl(str(settings['branding.logo_light_url']));
   const chatEnabled  = bool(settings['chat.enabled'], true);
 
   return (

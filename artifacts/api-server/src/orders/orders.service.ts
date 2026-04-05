@@ -4,6 +4,7 @@ import {
   BadRequestException,
   Inject,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { eq, desc, and, or, like, inArray, not, lt, gt } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
@@ -17,6 +18,7 @@ import {
 } from "@workspace/db";
 import { AvailabilityService } from "../availability/availability.service.js";
 import { PricingService } from "../pricing/pricing.service.js";
+import { BusinessNotificationsService } from "../notifications/business-notifications.service.js";
 import { generateOrderNumber } from "@workspace/shared";
 
 type DrizzleDb = typeof import("@workspace/db").db;
@@ -58,7 +60,8 @@ export class OrdersService {
   constructor(
     @Inject(DB_TOKEN) private db: DrizzleDb,
     private availabilityService: AvailabilityService,
-    private pricingService: PricingService
+    private pricingService: PricingService,
+    @Optional() private businessNotifications: BusinessNotificationsService,
   ) {}
 
   async findAll(params: {
@@ -326,7 +329,15 @@ export class OrdersService {
     });
 
     this.logger.log(`Order ${orderNumber} created successfully`);
-    return this.findByNumber(orderNumber);
+    const created = await this.findByNumber(orderNumber);
+    this.businessNotifications?.notifyNewOrder({
+      id: created.id,
+      orderNumber: created.orderNumber ?? undefined,
+      customerName: created.customerName ?? undefined,
+      customerPhone: created.customerPhone ?? undefined,
+      totalAmount: created.totalAmount ?? undefined,
+    }).catch((e) => this.logger.warn("Notification failed:", e));
+    return created;
   }
 
   async updateStatus(id: number, status: string, comment?: string, changedById?: number) {

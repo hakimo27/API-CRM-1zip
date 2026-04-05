@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, Inject } from "@nestjs/common";
+import { Injectable, NotFoundException, Inject, Optional } from "@nestjs/common";
+import { BusinessNotificationsService } from "../notifications/business-notifications.service.js";
 import { eq, desc, inArray, and } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
 import {
@@ -12,7 +13,10 @@ type DrizzleDb = typeof import("@workspace/db").db;
 
 @Injectable()
 export class SalesService {
-  constructor(@Inject(DB_TOKEN) private db: DrizzleDb) {}
+  constructor(
+    @Inject(DB_TOKEN) private db: DrizzleDb,
+    @Optional() private businessNotifications: BusinessNotificationsService,
+  ) {}
 
   async findAllProducts(params: { active?: boolean; search?: string }) {
     const { active, search } = params;
@@ -199,7 +203,14 @@ export class SalesService {
       });
     }
 
-    return this.findOrderById(order.id);
+    const result = await this.findOrderById(order.id);
+    this.businessNotifications?.notifyNewSaleOrder({
+      id: result.id,
+      orderNumber: result.orderNumber ?? undefined,
+      totalAmount: result.totalAmount ?? undefined,
+      deliveryAddress: result.deliveryAddress as any,
+    }).catch(() => {});
+    return result;
   }
 
   async addOrderItem(orderId: number, data: { productId: number; quantity: number; price?: number }) {

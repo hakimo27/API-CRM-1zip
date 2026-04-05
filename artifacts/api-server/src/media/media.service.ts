@@ -13,7 +13,7 @@ export class MediaService {
   async listFiles(folder?: string): Promise<any[]> {
     const baseDir = folder ? path.join(UPLOADS_DIR, folder) : UPLOADS_DIR;
     this.ensureDir(baseDir);
-    const baseUrl = process.env.PUBLIC_UPLOADS_URL || "/uploads";
+    const baseUrl = process.env.PUBLIC_UPLOADS_URL || "/api/uploads";
 
     const readDir = (dir: string, prefix: string): any[] => {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -54,7 +54,7 @@ export class MediaService {
   async saveFile(file: Express.Multer.File, folder?: string): Promise<any> {
     const targetDir = folder ? path.join(UPLOADS_DIR, folder) : UPLOADS_DIR;
     this.ensureDir(targetDir);
-    const baseUrl = process.env.PUBLIC_UPLOADS_URL || "/uploads";
+    const baseUrl = process.env.PUBLIC_UPLOADS_URL || "/api/uploads";
     const filePath = path.join(targetDir, file.filename || file.originalname);
     if (file.path && file.path !== filePath) {
       fs.renameSync(file.path, filePath);

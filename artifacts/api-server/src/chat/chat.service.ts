@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, Inject } from "@nestjs/common";
+import { Injectable, NotFoundException, Inject, Optional } from "@nestjs/common";
+import { BusinessNotificationsService } from "../notifications/business-notifications.service.js";
 import { eq, desc, and } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
 import { chatSessionsTable, chatMessagesTable } from "@workspace/db";
@@ -7,7 +8,10 @@ type DrizzleDb = typeof import("@workspace/db").db;
 
 @Injectable()
 export class ChatService {
-  constructor(@Inject(DB_TOKEN) private db: DrizzleDb) {}
+  constructor(
+    @Inject(DB_TOKEN) private db: DrizzleDb,
+    @Optional() private businessNotifications: BusinessNotificationsService,
+  ) {}
 
   async getSessions(params: { status?: string; channel?: string; page?: number; limit?: number }) {
     const { status, channel, page = 1, limit = 50 } = params;
@@ -62,6 +66,12 @@ export class ChatService {
       })
       .returning();
 
+    this.businessNotifications?.notifyNewChat({
+      id: session!.id,
+      channel: session!.channel,
+      metadata: session!.metadata as Record<string, unknown> | null,
+    }).catch(() => {});
+
     return session!;
   }
 
@@ -99,6 +109,13 @@ export class ChatService {
       .update(chatSessionsTable)
       .set({ updatedAt: new Date() })
       .where(eq(chatSessionsTable.id, sessionId));
+
+    if (sender === "customer") {
+      this.businessNotifications?.notifyNewMessage(
+        { id: sessionId },
+        { content, senderName },
+      ).catch(() => {});
+    }
 
     return message!;
   }
