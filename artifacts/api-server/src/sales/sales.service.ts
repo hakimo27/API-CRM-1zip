@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, Inject, Optional } from "@nestjs/common";
 import { BusinessNotificationsService } from "../notifications/business-notifications.service.js";
+import { NotificationsService } from "../notifications/notifications.service.js";
 import { eq, desc, inArray, and } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
 import {
@@ -8,6 +9,7 @@ import {
   saleProductsTable,
 } from "@workspace/db";
 import { generateOrderNumber } from "@workspace/shared";
+import { slugify, ensureUniqueSlug } from "../common/utils/slug.js";
 
 type DrizzleDb = typeof import("@workspace/db").db;
 
@@ -16,6 +18,7 @@ export class SalesService {
   constructor(
     @Inject(DB_TOKEN) private db: DrizzleDb,
     @Optional() private businessNotifications: BusinessNotificationsService,
+    @Optional() private notificationsService: NotificationsService,
   ) {}
 
   async findAllProducts(params: { active?: boolean; search?: string }) {
@@ -57,11 +60,17 @@ export class SalesService {
   }
 
   async createProduct(data: typeof saleProductsTable.$inferInsert) {
+    const baseSlug = (data.slug as string)?.trim() ? slugify(data.slug as string) : slugify(data.name || "");
+    (data as any).slug = await ensureUniqueSlug(this.db, saleProductsTable, saleProductsTable.slug, baseSlug);
     const [created] = await this.db.insert(saleProductsTable).values(data).returning();
     return created;
   }
 
   async updateProduct(id: number, data: Partial<typeof saleProductsTable.$inferInsert>) {
+    if (data.slug !== undefined) {
+      const base = (data.slug as string)?.trim() ? slugify(data.slug as string) : slugify(data.name || "");
+      (data as any).slug = await ensureUniqueSlug(this.db, saleProductsTable, saleProductsTable.slug, base, id);
+    }
     const [updated] = await this.db
       .update(saleProductsTable)
       .set(data)
@@ -218,6 +227,30 @@ export class SalesService {
       totalAmount: result.totalAmount ?? undefined,
       deliveryAddress: result.deliveryAddress as any,
     }).catch(() => {});
+
+    if (this.notificationsService) {
+      // Customer confirmation email
+      const email = data.customerEmail || (data.deliveryAddress as any)?.email;
+      if (email) {
+        this.notificationsService
+          .sendSaleOrderConfirmation(email, data.customerName, result.orderNumber!)
+          .catch(() => {});
+      }
+      // Manager notification email
+      this.notificationsService.getManagerEmail().then((managerEmail) => {
+        if (managerEmail) {
+          this.notificationsService!.sendNewOrderNotificationToManager(
+            managerEmail,
+            result.orderNumber!,
+            data.customerName,
+            data.customerPhone,
+            String(totalAmount),
+            "sale"
+          ).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+
     return result;
   }
 

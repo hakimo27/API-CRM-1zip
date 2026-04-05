@@ -4,6 +4,15 @@ import { Waves, Users, Plus, Pencil, Trash2, X, Calendar, BookOpen, CheckCircle2
 import { useState, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
+function slugify(s: string): string {
+  const map: Record<string, string> = {
+    а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'yo',ж:'zh',з:'z',и:'i',й:'j',
+    к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',
+    х:'kh',ц:'ts',ч:'ch',ш:'sh',щ:'shch',ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya',
+  };
+  return s.toLowerCase().replace(/[а-яёъыь]/g, c => map[c] ?? c).replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+}
+
 const TYPES = [
   ['rafting', 'Рафтинг'], ['kayak_tour', 'Байдарочный тур'],
   ['instruction', 'Обучение'], ['excursion', 'Экскурсия'],
@@ -436,11 +445,17 @@ export default function ToursPage() {
           <div className="px-6 py-4 space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Название *" col2>
-                <input value={tourForm.title} onChange={e => setTourForm((f: any) => ({ ...f, title: e.target.value }))}
+                <input value={tourForm.title}
+                  onChange={e => setTourForm((f: any) => ({
+                    ...f,
+                    title: e.target.value,
+                    slug: creatingTour && !f._slugManual ? slugify(e.target.value) : f.slug,
+                  }))}
                   className={inputCls} placeholder="Рафтинг по реке Белой" />
               </Field>
               <Field label="Слаг">
-                <input value={tourForm.slug} onChange={e => setTourForm((f: any) => ({ ...f, slug: e.target.value }))}
+                <input value={tourForm.slug}
+                  onChange={e => setTourForm((f: any) => ({ ...f, slug: e.target.value, _slugManual: true }))}
                   className={inputCls} placeholder="rafting-belaya" />
               </Field>
               <Field label="Тип">

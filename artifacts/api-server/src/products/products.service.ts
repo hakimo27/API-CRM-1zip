@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, Inject } from "@nestjs/common";
 import { eq, and, asc, desc, like, or, inArray } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
 import { productsTable, productImagesTable, tariffsTable, categoriesTable } from "@workspace/db";
+import { slugify, ensureUniqueSlug } from "../common/utils/slug.js";
 
 type DrizzleDb = typeof import("@workspace/db").db;
 
@@ -95,6 +96,9 @@ export class ProductsService {
 
   async create(data: any) {
     const { tariffs, ...productData } = data;
+    const baseName = productData.name || "";
+    const baseSlug = productData.slug?.trim() ? slugify(productData.slug) : slugify(baseName);
+    productData.slug = await ensureUniqueSlug(this.db, productsTable, productsTable.slug, baseSlug);
     const [created] = await this.db.insert(productsTable).values(productData).returning();
     if (tariffs?.length) {
       await this.db.insert(tariffsTable).values(
@@ -106,6 +110,10 @@ export class ProductsService {
 
   async update(id: number, data: any) {
     const { tariffs, ...productData } = data;
+    if (productData.slug !== undefined) {
+      const base = productData.slug?.trim() ? slugify(productData.slug) : slugify(productData.name || "");
+      productData.slug = await ensureUniqueSlug(this.db, productsTable, productsTable.slug, base, id);
+    }
     const [updated] = await this.db.update(productsTable).set(productData).where(eq(productsTable.id, id)).returning();
     if (!updated) throw new NotFoundException("Товар не найден");
     if (tariffs !== undefined) {

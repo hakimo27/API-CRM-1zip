@@ -1,13 +1,18 @@
-import { Injectable, NotFoundException, Inject, BadRequestException } from "@nestjs/common";
+import { Injectable, NotFoundException, Inject, Optional, BadRequestException } from "@nestjs/common";
 import { eq, and, asc, desc, gte, like, or, sql, inArray } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
 import { toursTable, tourDatesTable, tourBookingsTable, usersTable } from "@workspace/db";
+import { NotificationsService } from "../notifications/notifications.service.js";
+import { slugify, ensureUniqueSlug } from "../common/utils/slug.js";
 
 type DrizzleDb = typeof import("@workspace/db").db;
 
 @Injectable()
 export class ToursService {
-  constructor(@Inject(DB_TOKEN) private db: DrizzleDb) {}
+  constructor(
+    @Inject(DB_TOKEN) private db: DrizzleDb,
+    @Optional() private notificationsService: NotificationsService,
+  ) {}
 
   async findAll(params: { type?: string; active?: boolean; featured?: boolean }) {
     const { type, active = true, featured } = params;
@@ -101,26 +106,17 @@ export class ToursService {
   }
 
   async create(data: any) {
-    if (!data.slug && data.title) {
-      data.slug = data.title
-        .toLowerCase()
-        .replace(/[^a-zа-я0-9\s]/gi, "")
-        .replace(/\s+/g, "-")
-        .replace(/[а-я]/g, (c: string) => {
-          const map: Record<string, string> = {
-            а:"a",б:"b",в:"v",г:"g",д:"d",е:"e",ё:"yo",ж:"zh",з:"z",
-            и:"i",й:"y",к:"k",л:"l",м:"m",н:"n",о:"o",п:"p",р:"r",
-            с:"s",т:"t",у:"u",ф:"f",х:"kh",ц:"ts",ч:"ch",ш:"sh",
-            щ:"shch",ъ:"",ы:"y",ь:"",э:"e",ю:"yu",я:"ya",
-          };
-          return map[c] || c;
-        });
-    }
+    const baseSlug = data.slug?.trim() ? slugify(data.slug) : slugify(data.title || "");
+    data.slug = await ensureUniqueSlug(this.db, toursTable, toursTable.slug, baseSlug);
     const [created] = await this.db.insert(toursTable).values(data).returning();
     return created;
   }
 
   async update(id: number, data: any) {
+    if (data.slug !== undefined) {
+      const base = data.slug?.trim() ? slugify(data.slug) : slugify(data.title || "");
+      data.slug = await ensureUniqueSlug(this.db, toursTable, toursTable.slug, base, id);
+    }
     const [updated] = await this.db
       .update(toursTable)
       .set({ ...data, updatedAt: new Date() })
@@ -244,6 +240,28 @@ export class ToursService {
       .update(tourDatesTable)
       .set({ seatsBooked: tourDate.seatsBooked + bookingData.participantCount })
       .where(eq(tourDatesTable.id, tourDateId));
+
+    // Get tour info for emails
+    const [tourRow] = await this.db.select().from(toursTable).where(eq(toursTable.id, tourDate.tourId)).limit(1);
+    const tourTitle = tourRow?.title || "Тур";
+    const totalAmount = String(parseFloat(tourDate.price as string) * bookingData.participantCount);
+
+    if (this.notificationsService) {
+      // Customer confirmation
+      if (bookingData.contactEmail) {
+        this.notificationsService
+          .sendTourBookingConfirmation(bookingData.contactEmail, bookingData.contactName, tourTitle, bookingData.participantCount, totalAmount)
+          .catch(() => {});
+      }
+      // Manager notification
+      this.notificationsService.getManagerEmail().then((managerEmail) => {
+        if (managerEmail) {
+          this.notificationsService!.sendTourBookingNotificationToManager(
+            managerEmail, booking.id, tourTitle, bookingData.contactName, bookingData.contactPhone, bookingData.participantCount, totalAmount
+          ).catch(() => {});
+        }
+      }).catch(() => {});
+    }
 
     return booking;
   }

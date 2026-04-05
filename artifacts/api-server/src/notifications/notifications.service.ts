@@ -149,6 +149,17 @@ export class NotificationsService {
     );
   }
 
+  private async getCompanyName(): Promise<string> {
+    const fallback = this.configService.get<string>("COMPANY_NAME") || "Байдабаза";
+    if (!this.settingsService) return fallback;
+    try {
+      const raw = await this.settingsService.get("general.company_name").catch(() => null);
+      return (typeof raw === "string" ? raw.replace(/^"|"$/g, "").trim() : "") || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
   async getManagerEmail(): Promise<string | null> {
     const fromEnv = this.configService.get<string>("MANAGER_EMAIL");
     if (fromEnv) return fromEnv;
@@ -162,38 +173,113 @@ export class NotificationsService {
     }
   }
 
-  // ─── Public send methods ──────────────────────────────────────────────────
+  // ─── HTML template helper ─────────────────────────────────────────────────
+
+  private async buildHtml(opts: {
+    title: string;
+    preheader?: string;
+    body: string;
+    cta?: { label: string; url: string };
+  }): Promise<string> {
+    const company = await this.getCompanyName();
+    const ctaHtml = opts.cta
+      ? `<div style="text-align:center;margin:28px 0">
+           <a href="${opts.cta.url}" style="display:inline-block;padding:14px 32px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600">${opts.cta.label}</a>
+         </div>`
+      : "";
+    return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${opts.title}</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+${opts.preheader ? `<div style="display:none;font-size:1px;color:#f1f5f9;max-height:0;overflow:hidden">${opts.preheader}</div>` : ""}
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 0">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+      <!-- header -->
+      <tr><td style="background:#1d4ed8;padding:24px 32px">
+        <p style="margin:0;color:#fff;font-size:20px;font-weight:700;letter-spacing:-.3px">${company}</p>
+      </td></tr>
+      <!-- body -->
+      <tr><td style="padding:32px 32px 24px">
+        ${opts.body}
+        ${ctaHtml}
+      </td></tr>
+      <!-- footer -->
+      <tr><td style="background:#f8fafc;padding:20px 32px;border-top:1px solid #e2e8f0">
+        <p style="margin:0;font-size:12px;color:#94a3b8;text-align:center">© ${new Date().getFullYear()} ${company}. Это автоматическое сообщение — не отвечайте на него.</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
+  }
+
+  private infoRow(label: string, value: string): string {
+    return `<tr>
+      <td style="padding:8px 12px;font-size:13px;font-weight:600;color:#374151;background:#f8fafc;border-bottom:1px solid #e5e7eb;white-space:nowrap">${label}</td>
+      <td style="padding:8px 12px;font-size:13px;color:#111827;border-bottom:1px solid #e5e7eb">${value}</td>
+    </tr>`;
+  }
+
+  private infoTable(rows: [string, string][]): string {
+    return `<table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin:20px 0">
+      ${rows.map(([l, v]) => this.infoRow(l, v)).join("")}
+    </table>`;
+  }
+
+  // ─── Email senders ────────────────────────────────────────────────────────
 
   async sendEmailVerification(email: string, name: string, token: string) {
     const url = `${this.getSiteUrl()}/verify-email?token=${token}`;
-    await this.sendEmail(email, "Подтверждение email — КаякРент", `
-      <h2>Добро пожаловать, ${name}!</h2>
-      <p>Для подтверждения email нажмите на кнопку:</p>
-      <a href="${url}" style="padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;display:inline-block">Подтвердить email</a>
-      <p>Ссылка действительна 24 часа.</p>
-    `);
+    const company = await this.getCompanyName();
+    const html = await this.buildHtml({
+      title: "Подтверждение email",
+      preheader: `Добро пожаловать, ${name}! Подтвердите ваш email.`,
+      body: `<h2 style="margin:0 0 16px;font-size:22px;color:#111827">Добро пожаловать, ${name}!</h2>
+             <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px">Благодарим за регистрацию в ${company}. Для завершения регистрации подтвердите ваш email.</p>
+             <p style="color:#6b7280;font-size:13px;margin:20px 0 0">Ссылка действительна 24 часа.</p>`,
+      cta: { label: "Подтвердить email", url },
+    });
+    await this.sendEmail(email, `Подтверждение email — ${company}`, html);
   }
 
   async sendPasswordReset(email: string, name: string, token: string) {
     const url = `${this.getSiteUrl()}/reset-password?token=${token}`;
-    await this.sendEmail(email, "Сброс пароля — КаякРент", `
-      <h2>Сброс пароля</h2>
-      <p>Здравствуйте, ${name}!</p>
-      <p>Для сброса пароля нажмите на кнопку:</p>
-      <a href="${url}" style="padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;display:inline-block">Сбросить пароль</a>
-      <p>Ссылка действительна 1 час. Если вы не запрашивали сброс пароля, проигнорируйте это письмо.</p>
-    `);
+    const company = await this.getCompanyName();
+    const html = await this.buildHtml({
+      title: "Сброс пароля",
+      preheader: "Запрос на сброс пароля",
+      body: `<h2 style="margin:0 0 16px;font-size:22px;color:#111827">Сброс пароля</h2>
+             <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px">Здравствуйте, ${name}! Мы получили запрос на сброс пароля для вашего аккаунта.</p>
+             <p style="color:#6b7280;font-size:13px;margin:20px 0 0">Ссылка действительна 1 час. Если вы не запрашивали сброс пароля — просто проигнорируйте это письмо.</p>`,
+      cta: { label: "Сбросить пароль", url },
+    });
+    await this.sendEmail(email, `Сброс пароля — ${company}`, html);
   }
 
   async sendOrderConfirmation(email: string, name: string, orderNumber: string) {
-    const url = `${this.getSiteUrl()}/orders/${orderNumber}`;
-    await this.sendEmail(email, `Заказ ${orderNumber} принят — КаякРент`, `
-      <h2>Заказ принят!</h2>
-      <p>Здравствуйте, ${name}!</p>
-      <p>Ваш заказ <strong>${orderNumber}</strong> успешно принят.</p>
-      <p>Мы свяжемся с вами в ближайшее время для уточнения деталей.</p>
-      <p><a href="${url}" style="color:#2563eb">Посмотреть заказ</a></p>
-    `);
+    const company = await this.getCompanyName();
+    const html = await this.buildHtml({
+      title: `Заказ ${orderNumber} принят`,
+      preheader: `Ваш заказ ${orderNumber} успешно оформлен`,
+      body: `<h2 style="margin:0 0 8px;font-size:22px;color:#111827">Заказ принят!</h2>
+             <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px">Здравствуйте, ${name}! Ваш заказ на аренду успешно оформлен.</p>
+             ${this.infoTable([["Номер заказа", orderNumber], ["Статус", "Принят"]])}
+             <p style="color:#374151;font-size:14px;line-height:1.6">Мы свяжемся с вами в ближайшее время для уточнения деталей.</p>`,
+    });
+    await this.sendEmail(email, `Заказ ${orderNumber} принят — ${company}`, html);
+  }
+
+  async sendSaleOrderConfirmation(email: string, name: string, orderNumber: string) {
+    const company = await this.getCompanyName();
+    const html = await this.buildHtml({
+      title: `Заказ ${orderNumber} оформлен`,
+      preheader: `Ваш заказ в магазине ${company} успешно оформлен`,
+      body: `<h2 style="margin:0 0 8px;font-size:22px;color:#111827">Заказ оформлен!</h2>
+             <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px">Здравствуйте, ${name}! Ваш заказ в магазине успешно принят.</p>
+             ${this.infoTable([["Номер заказа", orderNumber], ["Статус", "В обработке"]])}
+             <p style="color:#374151;font-size:14px;line-height:1.6">Мы свяжемся с вами для подтверждения и уточнения деталей доставки.</p>`,
+    });
+    await this.sendEmail(email, `Заказ ${orderNumber} оформлен — ${company}`, html);
   }
 
   async sendOrderStatusUpdate(email: string, name: string, orderNumber: string, status: string) {
@@ -201,11 +287,36 @@ export class NotificationsService {
       confirmed: "Подтверждён", paid: "Оплачен", in_progress: "В процессе",
       completed: "Завершён", cancelled: "Отменён",
     };
-    await this.sendEmail(email, `Статус заказа ${orderNumber} изменён — КаякРент`, `
-      <h2>Статус заказа изменён</h2>
-      <p>Здравствуйте, ${name}!</p>
-      <p>Статус вашего заказа <strong>${orderNumber}</strong> изменён на: <strong>${statusMap[status] || status}</strong>.</p>
-    `);
+    const company = await this.getCompanyName();
+    const statusLabel = statusMap[status] || status;
+    const html = await this.buildHtml({
+      title: `Статус заказа ${orderNumber} изменён`,
+      preheader: `Статус вашего заказа ${orderNumber}: ${statusLabel}`,
+      body: `<h2 style="margin:0 0 8px;font-size:22px;color:#111827">Статус заказа изменён</h2>
+             <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px">Здравствуйте, ${name}!</p>
+             ${this.infoTable([["Номер заказа", orderNumber], ["Новый статус", `<strong>${statusLabel}</strong>`]])}`,
+    });
+    await this.sendEmail(email, `Статус заказа ${orderNumber} — ${company}`, html);
+  }
+
+  async sendTourBookingConfirmation(
+    email: string, name: string, tourTitle: string, participants: number, totalAmount: string
+  ) {
+    const company = await this.getCompanyName();
+    const html = await this.buildHtml({
+      title: "Бронирование тура подтверждено",
+      preheader: `Ваше бронирование тура «${tourTitle}» принято`,
+      body: `<h2 style="margin:0 0 8px;font-size:22px;color:#111827">Бронирование принято!</h2>
+             <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px">Здравствуйте, ${name}! Ваше бронирование успешно оформлено.</p>
+             ${this.infoTable([
+               ["Тур", tourTitle],
+               ["Участников", String(participants)],
+               ["Сумма", `${Number(totalAmount).toLocaleString("ru")} ₽`],
+               ["Статус", "Ожидает подтверждения"],
+             ])}
+             <p style="color:#374151;font-size:14px;line-height:1.6">Наш менеджер свяжется с вами в ближайшее время для подтверждения бронирования и уточнения деталей.</p>`,
+    });
+    await this.sendEmail(email, `Бронирование тура «${tourTitle}» — ${company}`, html);
   }
 
   async sendNewOrderNotificationToManager(
@@ -216,21 +327,51 @@ export class NotificationsService {
     totalAmount: string,
     orderType: "rental" | "sale" = "rental"
   ) {
-    const typeLabel = orderType === "sale" ? "продажа" : "аренда";
-    const adminUrl = `${this.getSiteUrl()}/crm/orders/${orderNumber}`;
-    await this.sendEmail(managerEmail, `Новый заказ ${orderNumber} (${typeLabel}) — КаякРент`, `
-      <h2>Новый заказ!</h2>
-      <table style="border-collapse:collapse;width:100%">
-        <tr><td style="padding:6px;font-weight:bold">Номер заказа</td><td style="padding:6px">${orderNumber}</td></tr>
-        <tr><td style="padding:6px;font-weight:bold">Тип</td><td style="padding:6px">${typeLabel}</td></tr>
-        <tr><td style="padding:6px;font-weight:bold">Клиент</td><td style="padding:6px">${customerName}</td></tr>
-        <tr><td style="padding:6px;font-weight:bold">Телефон</td><td style="padding:6px">${customerPhone}</td></tr>
-        <tr><td style="padding:6px;font-weight:bold">Сумма</td><td style="padding:6px">${totalAmount} ₽</td></tr>
-      </table>
-      <p style="margin-top:16px">
-        <a href="${adminUrl}" style="padding:10px 20px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;display:inline-block">Открыть в CRM</a>
-      </p>
-    `);
+    const typeLabel = orderType === "sale" ? "Магазин" : "Аренда";
+    const company = await this.getCompanyName();
+    const adminUrl = `${this.getSiteUrl()}/crm`;
+    const html = await this.buildHtml({
+      title: `Новый заказ ${orderNumber}`,
+      preheader: `Новый заказ ${orderType === "sale" ? "магазина" : "аренды"} ${orderNumber}`,
+      body: `<h2 style="margin:0 0 16px;font-size:22px;color:#111827">Новый заказ ${typeLabel}</h2>
+             ${this.infoTable([
+               ["Номер заказа", orderNumber],
+               ["Тип", typeLabel],
+               ["Клиент", customerName],
+               ["Телефон", customerPhone],
+               ["Сумма", `${Number(totalAmount).toLocaleString("ru")} ₽`],
+             ])}`,
+      cta: { label: "Открыть в CRM", url: adminUrl },
+    });
+    await this.sendEmail(managerEmail, `[${company}] Новый заказ ${orderNumber} (${typeLabel})`, html);
+  }
+
+  async sendTourBookingNotificationToManager(
+    managerEmail: string,
+    bookingId: number,
+    tourTitle: string,
+    contactName: string,
+    contactPhone: string,
+    participants: number,
+    totalAmount: string
+  ) {
+    const company = await this.getCompanyName();
+    const adminUrl = `${this.getSiteUrl()}/crm/tours`;
+    const html = await this.buildHtml({
+      title: "Новое бронирование тура",
+      preheader: `Новое бронирование: «${tourTitle}»`,
+      body: `<h2 style="margin:0 0 16px;font-size:22px;color:#111827">Новое бронирование тура</h2>
+             ${this.infoTable([
+               ["Тур", tourTitle],
+               ["Бронирование №", String(bookingId)],
+               ["Клиент", contactName],
+               ["Телефон", contactPhone],
+               ["Участников", String(participants)],
+               ["Сумма", `${Number(totalAmount).toLocaleString("ru")} ₽`],
+             ])}`,
+      cta: { label: "Открыть в CRM", url: adminUrl },
+    });
+    await this.sendEmail(managerEmail, `[${company}] Новое бронирование тура «${tourTitle}»`, html);
   }
 
   async sendTestEmail(toEmail: string): Promise<{ success: boolean; message: string; config?: string }> {

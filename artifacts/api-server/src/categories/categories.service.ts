@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, Inject } from "@nestjs/common";
 import { eq, asc, count } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
 import { categoriesTable, productsTable } from "@workspace/db";
+import { slugify, ensureUniqueSlug } from "../common/utils/slug.js";
 
 type DrizzleDb = typeof import("@workspace/db").db;
 
@@ -41,11 +42,17 @@ export class CategoriesService {
   }
 
   async create(data: typeof categoriesTable.$inferInsert) {
+    const baseSlug = (data.slug as string)?.trim() ? slugify(data.slug as string) : slugify(data.name || "");
+    (data as any).slug = await ensureUniqueSlug(this.db, categoriesTable, categoriesTable.slug, baseSlug);
     const [created] = await this.db.insert(categoriesTable).values(data).returning();
     return created;
   }
 
   async update(id: number, data: Partial<typeof categoriesTable.$inferInsert>) {
+    if (data.slug !== undefined) {
+      const base = (data.slug as string)?.trim() ? slugify(data.slug as string) : slugify(data.name || "");
+      (data as any).slug = await ensureUniqueSlug(this.db, categoriesTable, categoriesTable.slug, base, id);
+    }
     const [updated] = await this.db.update(categoriesTable).set(data).where(eq(categoriesTable.id, id)).returning();
     if (!updated) throw new NotFoundException("Категория не найдена");
     return updated;

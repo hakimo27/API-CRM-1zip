@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, Inject } from "@nestjs/common";
 import { eq, and, desc, asc } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
 import { articlesTable, pagesTable, faqsTable, reviewsTable, riversTable } from "@workspace/db";
+import { slugify, ensureUniqueSlug } from "../common/utils/slug.js";
 
 type DrizzleDb = typeof import("@workspace/db").db;
 
@@ -46,11 +47,17 @@ export class ContentService {
   }
 
   async createArticle(data: any) {
+    const baseSlug = data.slug?.trim() ? slugify(data.slug) : slugify(data.title || "");
+    data.slug = await ensureUniqueSlug(this.db, articlesTable, articlesTable.slug, baseSlug);
     const [created] = await this.db.insert(articlesTable).values(data).returning();
     return created;
   }
 
   async updateArticle(id: number, data: any) {
+    if (data.slug !== undefined) {
+      const base = data.slug?.trim() ? slugify(data.slug) : slugify(data.title || "");
+      data.slug = await ensureUniqueSlug(this.db, articlesTable, articlesTable.slug, base, id);
+    }
     const [updated] = await this.db
       .update(articlesTable)
       .set(data)
@@ -178,11 +185,17 @@ export class ContentService {
   }
 
   async createPage(data: any) {
+    const baseSlug = data.slug?.trim() ? slugify(data.slug) : slugify(data.title || "");
+    data.slug = await ensureUniqueSlug(this.db, pagesTable, pagesTable.slug, baseSlug);
     const [created] = await this.db.insert(pagesTable).values(data).returning();
     return created;
   }
 
   async updatePage(id: number, data: any) {
+    if (data.slug !== undefined) {
+      const base = data.slug?.trim() ? slugify(data.slug) : slugify(data.title || "");
+      data.slug = await ensureUniqueSlug(this.db, pagesTable, pagesTable.slug, base, id);
+    }
     const [updated] = await this.db.update(pagesTable).set({ ...data, updatedAt: new Date() }).where(eq(pagesTable.id, id)).returning();
     if (!updated) throw new NotFoundException("Страница не найдена");
     return updated;
@@ -205,11 +218,17 @@ export class ContentService {
   }
 
   async createRiver(data: any) {
+    const baseSlug = data.slug?.trim() ? slugify(data.slug) : slugify(data.name || data.title || "");
+    data.slug = await ensureUniqueSlug(this.db, riversTable, riversTable.slug, baseSlug);
     const [created] = await this.db.insert(riversTable).values(data).returning();
     return created;
   }
 
   async updateRiver(id: number, data: any) {
+    if (data.slug !== undefined) {
+      const base = data.slug?.trim() ? slugify(data.slug) : slugify(data.name || data.title || "");
+      data.slug = await ensureUniqueSlug(this.db, riversTable, riversTable.slug, base, id);
+    }
     const [updated] = await this.db.update(riversTable).set(data).where(eq(riversTable.id, id)).returning();
     if (!updated) throw new NotFoundException("Река не найдена");
     return updated;
