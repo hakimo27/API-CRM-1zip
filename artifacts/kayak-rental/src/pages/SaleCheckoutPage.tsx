@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
 import { useSaleCart } from '@/contexts/SaleCartContext';
 import { api } from '@/lib/api';
 import { Package, ChevronLeft, CheckCircle, MapPin, Truck, ShoppingBag, Loader2 } from 'lucide-react';
@@ -14,7 +15,8 @@ export default function SaleCheckoutPage() {
   const { items, totalAmount, clearCart } = useSaleCart();
   const [, navigate] = useLocation();
 
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('pickup');
@@ -24,6 +26,19 @@ export default function SaleCheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successOrder, setSuccessOrder] = useState<{ orderNumber: string; id: number } | null>(null);
+
+  const { data: settings } = useQuery<Record<string, any>>({
+    queryKey: ['public-settings'],
+    queryFn: () => api.get('/settings/public'),
+    staleTime: 60_000,
+  });
+
+  const deliveryEnabled = settings?.['delivery.enabled'] === true || settings?.['delivery.enabled'] === 'true';
+  const pickupEnabled = settings?.['delivery.self_pickup_enabled'] !== false && settings?.['delivery.self_pickup_enabled'] !== 'false';
+  const showDeliveryChoice = deliveryEnabled && pickupEnabled;
+
+  // If delivery is disabled and we have a 'delivery' method selected, reset to pickup
+  const effectiveMethod: DeliveryMethod = (!deliveryEnabled && deliveryMethod === 'delivery') ? 'pickup' : deliveryMethod;
 
   if (items.length === 0 && !successOrder) {
     return (
@@ -61,13 +76,15 @@ export default function SaleCheckoutPage() {
     );
   }
 
+  const fullName = [lastName.trim(), firstName.trim()].filter(Boolean).join(' ');
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !phone.trim()) {
+    if (!firstName.trim() || !phone.trim()) {
       setError('Укажите имя и телефон');
       return;
     }
-    if (deliveryMethod === 'delivery' && !address.trim()) {
+    if (effectiveMethod === 'delivery' && !address.trim()) {
       setError('Укажите адрес доставки');
       return;
     }
@@ -76,15 +93,15 @@ export default function SaleCheckoutPage() {
 
     try {
       const payload = {
-        customerName: name.trim(),
+        customerName: fullName || firstName.trim(),
         customerPhone: phone.trim(),
         customerEmail: email.trim() || undefined,
-        deliveryMethod,
+        deliveryMethod: effectiveMethod,
         deliveryAddress: {
-          name: name.trim(),
+          name: fullName || firstName.trim(),
           phone: phone.trim(),
-          address: deliveryMethod === 'delivery' ? address.trim() : 'Самовывоз',
-          city: city.trim() || 'Москва',
+          address: effectiveMethod === 'delivery' ? address.trim() : 'Самовывоз',
+          city: city.trim() || '',
         },
         items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
         notes: notes.trim() || undefined,
@@ -100,6 +117,10 @@ export default function SaleCheckoutPage() {
     }
   };
 
+  const stepNum = (n: number) => (
+    <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">{n}</span>
+  );
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
       <div className="flex items-center gap-3 mb-6">
@@ -113,17 +134,24 @@ export default function SaleCheckoutPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left: forms */}
           <div className="lg:col-span-2 space-y-5">
-            {/* Customer */}
+
+            {/* 1. Contact */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5">
               <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span>
-                Контактные данные
+                {stepNum(1)} Контактные данные
               </h2>
               <div className="space-y-3">
-                <div>
-                  <label className={labelCls}>Имя *</label>
-                  <input value={name} onChange={e => setName(e.target.value)} className={inputCls}
-                    placeholder="Ваше имя" required />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Фамилия</label>
+                    <input value={lastName} onChange={e => setLastName(e.target.value)}
+                      className={inputCls} placeholder="Иванов" />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Имя *</label>
+                    <input value={firstName} onChange={e => setFirstName(e.target.value)}
+                      className={inputCls} placeholder="Иван" required />
+                  </div>
                 </div>
                 <div>
                   <label className={labelCls}>Телефон *</label>
@@ -131,67 +159,93 @@ export default function SaleCheckoutPage() {
                 </div>
                 <div>
                   <label className={labelCls}>Email</label>
-                  <input value={email} onChange={e => setEmail(e.target.value)} className={inputCls}
-                    type="email" placeholder="email@example.com" />
+                  <input value={email} onChange={e => setEmail(e.target.value)}
+                    className={inputCls} type="email" placeholder="email@example.com" />
                 </div>
               </div>
             </div>
 
-            {/* Delivery */}
+            {/* 2. Delivery / Pickup */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5">
               <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span>
-                Способ получения
+                {stepNum(2)} Способ получения
               </h2>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                {[
-                  { value: 'pickup', label: 'Самовывоз', icon: MapPin, desc: 'Забрать из шоурума' },
-                  { value: 'delivery', label: 'Доставка', icon: Truck, desc: 'Доставим по адресу' },
-                ].map(opt => (
-                  <button key={opt.value} type="button"
-                    onClick={() => setDeliveryMethod(opt.value as DeliveryMethod)}
-                    className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
-                      deliveryMethod === opt.value
-                        ? 'border-blue-600 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}>
-                    <opt.icon className={`w-5 h-5 mt-0.5 flex-shrink-0 ${deliveryMethod === opt.value ? 'text-blue-600' : 'text-gray-400'}`} />
-                    <div>
-                      <div className={`font-medium text-sm ${deliveryMethod === opt.value ? 'text-blue-700' : 'text-gray-700'}`}>{opt.label}</div>
-                      <div className="text-xs text-gray-400">{opt.desc}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
 
-              {deliveryMethod === 'delivery' && (
-                <div className="space-y-3 border-t border-gray-100 pt-4">
+              {showDeliveryChoice ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    {[
+                      { value: 'pickup', label: 'Самовывоз', icon: MapPin, desc: 'Забрать из шоурума' },
+                      { value: 'delivery', label: 'Доставка', icon: Truck, desc: 'Доставим по адресу' },
+                    ].map(opt => (
+                      <button key={opt.value} type="button"
+                        onClick={() => setDeliveryMethod(opt.value as DeliveryMethod)}
+                        className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
+                          effectiveMethod === opt.value
+                            ? 'border-blue-600 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}>
+                        <opt.icon className={`w-5 h-5 mt-0.5 flex-shrink-0 ${effectiveMethod === opt.value ? 'text-blue-600' : 'text-gray-400'}`} />
+                        <div>
+                          <div className={`font-medium text-sm ${effectiveMethod === opt.value ? 'text-blue-700' : 'text-gray-700'}`}>{opt.label}</div>
+                          <div className="text-xs text-gray-400">{opt.desc}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  {effectiveMethod === 'delivery' && (
+                    <div className="space-y-3 border-t border-gray-100 pt-4">
+                      <div>
+                        <label className={labelCls}>Город</label>
+                        <input value={city} onChange={e => setCity(e.target.value)} className={inputCls} placeholder="Москва" />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Адрес доставки *</label>
+                        <input value={address} onChange={e => setAddress(e.target.value)}
+                          className={inputCls} placeholder="Улица, дом, квартира" />
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : deliveryEnabled && !pickupEnabled ? (
+                /* Only delivery available */
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-blue-600 bg-blue-50">
+                    <Truck className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                    <div>
+                      <div className="font-medium text-sm text-blue-700">Доставка</div>
+                      <div className="text-xs text-gray-400">Доставим по адресу</div>
+                    </div>
+                  </div>
                   <div>
                     <label className={labelCls}>Город</label>
                     <input value={city} onChange={e => setCity(e.target.value)} className={inputCls} placeholder="Москва" />
                   </div>
                   <div>
                     <label className={labelCls}>Адрес доставки *</label>
-                    <input value={address} onChange={e => setAddress(e.target.value)} className={inputCls}
-                      placeholder="Улица, дом, квартира" />
+                    <input value={address} onChange={e => setAddress(e.target.value)}
+                      className={inputCls} placeholder="Улица, дом, квартира" />
                   </div>
                 </div>
-              )}
-
-              {deliveryMethod === 'pickup' && (
-                <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-600">
-                  <MapPin className="w-4 h-4 inline mr-1 text-blue-500" />
-                  Адрес шоурума и режим работы можно узнать в разделе{' '}
-                  <Link href="/info/contacts" className="text-blue-600 hover:underline">Контакты</Link>
+              ) : (
+                /* Only pickup available (delivery disabled) */
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-blue-50 border-2 border-blue-600">
+                  <MapPin className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium text-sm text-blue-700">Самовывоз</div>
+                    <div className="text-xs text-gray-400">
+                      Адрес шоурума и режим работы —{' '}
+                      <Link href="/info/contacts" className="text-blue-600 hover:underline">в разделе Контакты</Link>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Notes */}
+            {/* 3. Notes */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5">
               <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span>
-                Комментарий к заказу
+                {stepNum(3)} Комментарий к заказу
               </h2>
               <textarea value={notes} onChange={e => setNotes(e.target.value)}
                 className={inputCls + ' resize-none'} rows={3}
@@ -225,10 +279,14 @@ export default function SaleCheckoutPage() {
                   <span>Товары ({items.length})</span>
                   <span>{totalAmount.toLocaleString('ru-RU')} ₽</span>
                 </div>
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>Доставка</span>
-                  <span className="text-gray-400">уточняется</span>
-                </div>
+                {(deliveryEnabled || effectiveMethod === 'delivery') && (
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Доставка</span>
+                    <span className="text-gray-400">
+                      {effectiveMethod === 'pickup' ? 'Самовывоз' : 'уточняется'}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center font-bold text-gray-900 pt-1 border-t border-gray-100">
                   <span>Итого</span>
                   <span className="text-lg">{totalAmount.toLocaleString('ru-RU')} ₽</span>
