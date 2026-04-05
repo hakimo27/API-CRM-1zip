@@ -52,10 +52,14 @@ function LogoMark({ name, logoUrl }: { name: string; logoUrl: string }) {
 }
 
 function LogoMarkLight({ name, logoUrl, logoLightUrl }: { name: string; logoUrl: string; logoLightUrl: string }) {
-  const src = logoLightUrl || logoUrl;
-  if (src) {
+  if (logoLightUrl) {
     return (
-      <img src={src} alt={name} className="h-12 w-auto max-w-[160px] object-contain brightness-0 invert" />
+      <img src={logoLightUrl} alt={name} className="h-12 w-auto max-w-[160px] object-contain" />
+    );
+  }
+  if (logoUrl) {
+    return (
+      <img src={logoUrl} alt={name} className="h-12 w-auto max-w-[160px] object-contain" />
     );
   }
   return (

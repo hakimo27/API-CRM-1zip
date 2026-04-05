@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { BookOpen, HelpCircle, FileText, Star, ScrollText, Plus, Pencil, Trash2, X, ToggleLeft, ToggleRight, Search } from 'lucide-react';
+import { BookOpen, HelpCircle, FileText, Star, ScrollText, Plus, Pencil, Trash2, X, ToggleLeft, ToggleRight, Search, ExternalLink } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
@@ -277,55 +277,83 @@ function PagesTab() {
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => api.patch(`/content/pages/${id}`, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pages'] }); toast({ title: 'Сохранено' }); setEditing(null); }, onError: (e: any) => toast({ title: 'Ошибка', description: e.message, variant: 'destructive' }) });
   const deleteMut = useMutation({ mutationFn: (id: number) => api.delete(`/content/pages/${id}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pages'] }); toast({ title: 'Удалено' }); setDeletingId(null); }, onError: (e: any) => toast({ title: 'Ошибка', description: e.message, variant: 'destructive' }) });
 
+  const siteOrigin = window.location.origin.replace('/crm', '').replace(':5174', ':5173').replace(':5175', ':5173');
+
   const PageForm = () => (
     <div className="px-6 py-4 space-y-4">
+      {form.slug && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg text-xs text-blue-700">
+          <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>Страница будет доступна по адресу: </span>
+          <a href={`${siteOrigin}/info/${form.slug}`} target="_blank" rel="noopener noreferrer" className="font-mono underline underline-offset-2 hover:text-blue-900">/info/{form.slug}</a>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
-        <F label="Заголовок *"><input value={form.title} onChange={e => setForm((f: any) => ({ ...f, title: e.target.value, slug: slugify(e.target.value) }))} className={inputCls} /></F>
-        <F label="Слаг"><input value={form.slug} onChange={e => setForm((f: any) => ({ ...f, slug: e.target.value }))} className={inputCls} /></F>
-        <F label="Meta Title"><input value={form.metaTitle} onChange={e => setForm((f: any) => ({ ...f, metaTitle: e.target.value }))} className={inputCls} /></F>
-        <F label="Meta Description"><input value={form.metaDescription} onChange={e => setForm((f: any) => ({ ...f, metaDescription: e.target.value }))} className={inputCls} /></F>
+        <F label="Заголовок *"><input value={form.title} onChange={e => setForm((f: any) => ({ ...f, title: e.target.value, ...(creating ? { slug: slugify(e.target.value) } : {}) }))} className={inputCls} placeholder="О компании" /></F>
+        <F label="Слаг (URL)">
+          <input value={form.slug} onChange={e => setForm((f: any) => ({ ...f, slug: e.target.value }))} className={inputCls + ' font-mono'} placeholder="about" readOnly={!!editing} />
+        </F>
+        <F label="Meta Title (SEO)"><input value={form.metaTitle} onChange={e => setForm((f: any) => ({ ...f, metaTitle: e.target.value }))} className={inputCls} placeholder={form.title || 'О компании — Байдабаза'} /></F>
+        <F label="Meta Description (SEO)"><input value={form.metaDescription} onChange={e => setForm((f: any) => ({ ...f, metaDescription: e.target.value }))} className={inputCls} placeholder="Краткое описание для поисковиков (150–160 символов)" /></F>
       </div>
-      <F label="Содержимое"><textarea value={form.content} onChange={e => setForm((f: any) => ({ ...f, content: e.target.value }))} className={inputCls + ' resize-none'} rows={8} /></F>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm((f: any) => ({ ...f, active: e.target.checked }))} className="rounded" />Активна</label>
+      <F label="Содержимое страницы">
+        <textarea value={form.content} onChange={e => setForm((f: any) => ({ ...f, content: e.target.value }))} className={inputCls + ' resize-y'} rows={12} placeholder="Введите текст страницы. Разделяйте абзацы пустой строкой." />
+      </F>
+      <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={form.active} onChange={e => setForm((f: any) => ({ ...f, active: e.target.checked }))} className="rounded" /><span>Страница активна (видна на сайте)</span></label>
     </div>
   );
 
   return (
     <>
-      <div className="flex justify-end mb-4">
-        <button onClick={() => { setForm({ title: '', slug: '', content: '', active: true, metaTitle: '', metaDescription: '' }); setCreating(true); }} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700"><Plus className="w-4 h-4" /> Создать страницу</button>
+      <div className="flex items-start justify-between mb-4 gap-4">
+        <div className="flex-1 flex items-start gap-2.5 px-4 py-3 bg-blue-50 rounded-xl text-sm text-blue-800">
+          <FileText className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-500" />
+          <div>
+            <p className="font-medium mb-0.5">Информационные страницы сайта</p>
+            <p className="text-blue-700 text-xs">Каждая страница доступна по адресу <span className="font-mono bg-blue-100 px-1 rounded">/info/:слаг</span>. Например: «О компании» → <span className="font-mono bg-blue-100 px-1 rounded">/info/about</span>. Изменения применяются немедленно.</p>
+          </div>
+        </div>
+        <button onClick={() => { setForm({ title: '', slug: '', content: '', active: true, metaTitle: '', metaDescription: '' }); setCreating(true); }} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 whitespace-nowrap flex-shrink-0"><Plus className="w-4 h-4" /> Создать страницу</button>
       </div>
       {isLoading ? <div className="flex justify-center py-8"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
         : pages.length === 0 ? <div className="text-center py-8 text-gray-400"><FileText className="w-10 h-10 mx-auto mb-2 opacity-30" /><p>Страниц нет</p></div>
         : (
           <table className="w-full"><thead><tr className="bg-gray-50">
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Название</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Слаг</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">URL на сайте</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
             <th className="px-4 py-3"></th>
           </tr></thead><tbody className="divide-y divide-gray-50">
             {pages.map((p: any) => (
               <tr key={p.id} className="hover:bg-gray-50/50">
                 <td className="px-4 py-3 font-medium text-sm text-gray-900">{p.title}</td>
-                <td className="px-4 py-3 text-xs text-gray-500 font-mono">{p.slug}</td>
+                <td className="px-4 py-3">
+                  <a href={`${siteOrigin}/info/${p.slug}`} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-mono hover:underline">
+                    /info/{p.slug}<ExternalLink className="w-3 h-3" />
+                  </a>
+                </td>
                 <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${p.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>{p.active ? 'Активна' : 'Скрыта'}</span></td>
-                <td className="px-4 py-3"><div className="flex gap-1 justify-end"><button onClick={() => { setForm({ title: p.title, slug: p.slug, content: p.content || '', active: p.active, metaTitle: p.metaTitle || '', metaDescription: p.metaDescription || '' }); setEditing(p); }} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Pencil className="w-4 h-4" /></button><button onClick={() => setDeletingId(p.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button></div></td>
+                <td className="px-4 py-3"><div className="flex gap-1 justify-end">
+                  <button onClick={() => { setForm({ title: p.title, slug: p.slug, content: p.content || '', active: p.active, metaTitle: p.metaTitle || '', metaDescription: p.metaDescription || '' }); setEditing(p); }} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Редактировать"><Pencil className="w-4 h-4" /></button>
+                  <button onClick={() => setDeletingId(p.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Удалить"><Trash2 className="w-4 h-4" /></button>
+                </div></td>
               </tr>
             ))}
           </tbody></table>
         )}
       {(creating || editing) && (
-        <Modal title={creating ? 'Новая страница' : 'Редактировать страницу'} onClose={() => { setCreating(false); setEditing(null); }}>
+        <Modal title={creating ? 'Новая страница' : `Редактировать: ${editing?.title}`} onClose={() => { setCreating(false); setEditing(null); }}>
           <PageForm />
           <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
             <button onClick={() => { setCreating(false); setEditing(null); }} className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium">Отмена</button>
-            <button onClick={() => creating ? createMut.mutate(form) : updateMut.mutate({ id: editing.id, data: form })} disabled={createMut.isPending || updateMut.isPending} className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{(createMut.isPending || updateMut.isPending) ? 'Сохранение...' : 'Сохранить'}</button>
+            <button onClick={() => creating ? createMut.mutate(form) : updateMut.mutate({ id: editing.id, data: form })} disabled={!form.title || !form.slug || createMut.isPending || updateMut.isPending} className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{(createMut.isPending || updateMut.isPending) ? 'Сохранение...' : 'Сохранить'}</button>
           </div>
         </Modal>
       )}
       {deletingId !== null && (
         <Modal title="Удалить страницу?" onClose={() => setDeletingId(null)}>
-          <div className="px-6 py-4"><p className="text-sm text-gray-600">Страница будет удалена.</p></div>
+          <div className="px-6 py-4"><p className="text-sm text-gray-600">Страница будет удалена без возможности восстановления.</p></div>
           <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
             <button onClick={() => setDeletingId(null)} className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium">Отмена</button>
             <button onClick={() => deleteMut.mutate(deletingId!)} disabled={deleteMut.isPending} className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 disabled:opacity-50">{deleteMut.isPending ? 'Удаление...' : 'Удалить'}</button>
