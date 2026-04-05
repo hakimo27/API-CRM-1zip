@@ -1,4 +1,4 @@
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Trash2, GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
 
 export interface SpecRow {
   label: string;
@@ -39,52 +39,78 @@ export default function SpecEditor({ specs, onChange }: Props) {
     onChange(next.map((s, i) => ({ ...s, sortOrder: i })));
   };
 
+  const inp = 'px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-full';
+
   return (
-    <div className="space-y-2">
+    <div className="rounded-xl border border-gray-200 overflow-hidden">
+      {/* Header */}
+      <div className="grid bg-gray-50 border-b border-gray-200 px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide"
+        style={{ gridTemplateColumns: '28px 1fr 160px 80px 36px' }}>
+        <span />
+        <span>Название характеристики</span>
+        <span>Значение</span>
+        <span>Ед. изм.</span>
+        <span />
+      </div>
+
       {specs.length === 0 && (
-        <div className="text-center py-6 text-sm text-gray-400 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-          Нет характеристик. Нажмите «Добавить» или выберите шаблон.
+        <div className="text-center py-8 text-sm text-gray-400 bg-white">
+          Нет характеристик — нажмите «Добавить» или выберите шаблон выше
         </div>
       )}
+
       {specs.map((spec, idx) => (
-        <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-xl p-2">
-          <div className="flex flex-col gap-0.5 text-gray-300 flex-shrink-0">
+        <div
+          key={idx}
+          className="grid items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-b-0 bg-white hover:bg-gray-50/60 transition-colors"
+          style={{ gridTemplateColumns: '28px 1fr 160px 80px 36px' }}
+        >
+          {/* Reorder controls */}
+          <div className="flex flex-col items-center gap-0.5">
             <button type="button" onClick={() => moveUp(idx)} disabled={idx === 0}
-              className="p-0.5 hover:text-gray-600 disabled:opacity-30 text-xs leading-none">▲</button>
-            <GripVertical className="w-3.5 h-3.5 mx-auto" />
+              className="text-gray-300 hover:text-gray-600 disabled:opacity-20 transition-colors">
+              <ChevronUp className="w-3.5 h-3.5" />
+            </button>
+            <GripVertical className="w-3.5 h-3.5 text-gray-300" />
             <button type="button" onClick={() => moveDown(idx)} disabled={idx === specs.length - 1}
-              className="p-0.5 hover:text-gray-600 disabled:opacity-30 text-xs leading-none">▼</button>
+              className="text-gray-300 hover:text-gray-600 disabled:opacity-20 transition-colors">
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <div className="flex-1 grid grid-cols-3 gap-2">
-            <input
-              value={spec.label}
-              onChange={e => update(idx, 'label', e.target.value)}
-              placeholder="Название (Вес, Длина...)"
-              className="px-2.5 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              value={spec.value}
-              onChange={e => update(idx, 'value', e.target.value)}
-              placeholder="Значение (0.9, 320...)"
-              className="px-2.5 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              value={spec.unit}
-              onChange={e => update(idx, 'unit', e.target.value)}
-              placeholder="Единица (кг, см, л...)"
-              className="px-2.5 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+
+          <input
+            value={spec.label}
+            onChange={e => update(idx, 'label', e.target.value)}
+            placeholder="Например: Длина"
+            className={inp}
+          />
+          <input
+            value={spec.value}
+            onChange={e => update(idx, 'value', e.target.value)}
+            placeholder="320"
+            className={inp}
+          />
+          <input
+            value={spec.unit}
+            onChange={e => update(idx, 'unit', e.target.value)}
+            placeholder="см"
+            className={inp}
+          />
+
           <button type="button" onClick={() => remove(idx)}
-            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0">
+            className="flex items-center justify-center p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
       ))}
-      <button type="button" onClick={add}
-        className="flex items-center gap-1.5 text-sm text-blue-600 hover:underline font-medium mt-1">
-        <Plus className="w-4 h-4" /> Добавить характеристику
-      </button>
+
+      {/* Footer */}
+      <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
+        <button type="button" onClick={add}
+          className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium">
+          <Plus className="w-4 h-4" /> Добавить характеристику
+        </button>
+      </div>
     </div>
   );
 }

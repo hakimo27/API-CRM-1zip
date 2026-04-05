@@ -194,11 +194,11 @@ export default function ProductPage() {
           {product.specifications && product.specifications.length > 0 && (
             <div className="mb-6">
               <h3 className="font-semibold text-gray-900 mb-3">Характеристики</h3>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl border border-gray-200 overflow-hidden">
                 {[...product.specifications].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map((spec, i) => (
-                  <div key={i} className="flex items-baseline justify-between bg-gray-50 rounded-xl px-3 py-2.5">
+                  <div key={i} className={`flex items-center justify-between px-4 py-2.5 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${i < product.specifications!.length - 1 ? 'border-b border-gray-100' : ''}`}>
                     <span className="text-sm text-gray-500">{spec.label}</span>
-                    <span className="text-sm font-semibold text-gray-900 ml-2">{spec.value}{spec.unit ? ` ${spec.unit}` : ''}</span>
+                    <span className="text-sm font-semibold text-gray-900">{spec.value}{spec.unit ? <span className="font-normal text-gray-400 ml-1">{spec.unit}</span> : ''}</span>
                   </div>
                 ))}
               </div>
