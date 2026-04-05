@@ -18,11 +18,24 @@ export default function ChatPage() {
   const [tab, setTab] = useState<FilterTab>('open');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { data: sessions = [], isLoading } = useQuery<any[]>({
+  const { data: sessions = [], isLoading, dataUpdatedAt } = useQuery<any[]>({
     queryKey: ['chat-sessions', 'all'],
     queryFn: () => api.get('/chat/sessions'),
-    refetchInterval: 8_000,
+    refetchInterval: 5_000,
+    staleTime: 3_000,
   });
+
+  const prevSessionCountRef = useRef<number | null>(null);
+  const [newSessionAlert, setNewSessionAlert] = useState(false);
+
+  useEffect(() => {
+    const openCount = sessions.filter((s: any) => s.status === 'open').length;
+    const prev = prevSessionCountRef.current;
+    if (prev !== null && openCount > prev) {
+      setNewSessionAlert(true);
+    }
+    prevSessionCountRef.current = openCount;
+  }, [dataUpdatedAt]);
 
   const filtered = sessions.filter(s => {
     if (tab === 'open') return s.status === 'open';
@@ -51,6 +64,11 @@ export default function ChatPage() {
       qc.invalidateQueries({ queryKey: ['crm-counts'] });
     },
   });
+
+  const handleDismissAlert = () => {
+    setNewSessionAlert(false);
+    setTab('open');
+  };
 
   const handleSelectSession = (session: any) => {
     setSelectedSession(session);
@@ -114,6 +132,16 @@ export default function ChatPage() {
       {/* Sessions list */}
       <div className="w-72 border-r border-gray-100 flex flex-col flex-shrink-0">
         <div className="px-4 py-4 border-b border-gray-100">
+          {newSessionAlert && (
+            <button
+              onClick={handleDismissAlert}
+              className="w-full mb-3 flex items-center gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-700 font-medium hover:bg-orange-100 transition-colors animate-pulse"
+            >
+              <span className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0" />
+              Новый диалог — нажмите, чтобы посмотреть
+              <X className="w-3.5 h-3.5 ml-auto flex-shrink-0" onClick={e => { e.stopPropagation(); setNewSessionAlert(false); }} />
+            </button>
+          )}
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-gray-900">Чаты</h2>
             <div className="flex items-center gap-1.5">

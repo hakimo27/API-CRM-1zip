@@ -60,6 +60,7 @@ export class ChatService {
     const insertValues: any = {
       channel: channel as any,
       status: "open",
+      unreadCount: 1,
       metadata: metadata || {},
     };
     if (customerName) insertValues.customerName = customerName;
@@ -214,6 +215,7 @@ export class ChatService {
       .values({
         channel: "web" as any,
         status: "open" as any,
+        unreadCount: 1,
         customerId: customer!.id,
         customerName: customer!.name,
         metadata: {
@@ -232,6 +234,7 @@ export class ChatService {
       sender: "customer",
       senderName: data.name || "Клиент",
     });
+    // The session already starts with unreadCount: 1 from the create above
 
     this.businessNotifications?.notifyNewChat({
       id: session!.id,

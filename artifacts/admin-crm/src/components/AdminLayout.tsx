@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import {
   LayoutDashboard, ShoppingBag, Package, Users, Tag, MapPin,
@@ -8,7 +8,8 @@ import {
   Store, FileText, HelpCircle, Star, Activity, Building2,
   BookOpen, ScrollText, Image, ShoppingCart, CalendarCheck, Fish, Layers,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: 'Супер-администратор',
@@ -128,6 +129,8 @@ function findCurrentPage(location: string) {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [location] = useLocation();
 
@@ -137,9 +140,38 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { data: counts = { newOrders: 0, newSaleOrders: 0, pendingBookings: 0, unreadChats: 0 } } = useQuery({
     queryKey: ['crm-counts'],
     queryFn: () => api.get<Record<string, number>>('/notifications/counts'),
-    refetchInterval: 30 * 1000,
-    staleTime: 15 * 1000,
+    refetchInterval: 8_000,
+    staleTime: 4_000,
   });
+
+  // Track previous unreadChats count and show toast when it increases
+  const prevUnreadChatsRef = useRef<number | null>(null);
+  const [newChatAlert, setNewChatAlert] = useState(false);
+
+  useEffect(() => {
+    const current = counts.unreadChats || 0;
+    const prev = prevUnreadChatsRef.current;
+
+    if (prev !== null && current > prev) {
+      const diff = current - prev;
+      toast({
+        title: diff === 1 ? '💬 Новый чат' : `💬 ${diff} новых чата`,
+        description: 'Клиент написал в чат — откройте раздел, чтобы ответить.',
+      });
+      setNewChatAlert(true);
+      // Also invalidate the chat sessions list so ChatPage refreshes immediately
+      qc.invalidateQueries({ queryKey: ['chat-sessions'] });
+    }
+
+    prevUnreadChatsRef.current = current;
+  }, [counts.unreadChats]);
+
+  // Clear the new-chat alert when manager navigates to the chat page
+  useEffect(() => {
+    if (location.startsWith('/chat')) {
+      setNewChatAlert(false);
+    }
+  }, [location]);
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -170,7 +202,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 {group.label}
               </p>
               <div className="space-y-0.5">
-                {group.items.map(item => <NavItem key={item.href} item={item} counts={counts} />)}
+                {group.items.map(item => {
+                  const isChatItem = item.countKey === 'unreadChats';
+                  return (
+                    <div key={item.href} className="relative">
+                      <NavItem item={item} counts={counts} />
+                      {isChatItem && newChatAlert && !location.startsWith('/chat') && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-orange-400 rounded-full animate-ping pointer-events-none" />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -203,6 +245,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </button>
           <h1 className="text-base font-semibold text-gray-900 truncate">{currentPage?.label || 'CRM'}</h1>
           <div className="ml-auto flex items-center gap-2">
+            {newChatAlert && !location.startsWith('/chat') && (
+              <Link href="/chat"
+                className="flex items-center gap-1.5 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded-full transition-colors animate-pulse">
+                <MessageSquare className="w-3.5 h-3.5" />
+                Новый чат
+              </Link>
+            )}
             <a href="/" target="_blank" rel="noopener noreferrer"
               className="text-xs text-gray-500 hover:text-blue-600 transition-colors hidden sm:block">
               → Публичный сайт
