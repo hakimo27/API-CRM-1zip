@@ -27,3 +27,12 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+JWT_SECRET = "72d6faf1c0dbdd756c33792c5d00dd1439c6692916acf8ae4fb74402f0cae12fde42fd6102bded137cf5c2e71cbeadd0"
+JWT_REFRESH_SECRET = "32f879fdcf9f56a0ea529960245e8022acc5e7f3464a3408c18f4b0a1f125d3dfe5be7b1115d25e25e94801658e44837"
+JWT_ACCESS_EXPIRES = "15m"
+JWT_REFRESH_EXPIRES = "7d"
+NODE_ENV = "development"
