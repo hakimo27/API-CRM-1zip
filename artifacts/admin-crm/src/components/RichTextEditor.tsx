@@ -8,7 +8,7 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { api } from '@/lib/api';
 import {
   Bold, Italic, UnderlineIcon, Strikethrough, Link2, Image as ImageIcon,
@@ -84,6 +84,9 @@ function Toolbar({ editor }: { editor: Editor }) {
 }
 
 export default function RichTextEditor({ value, onChange, placeholder = 'Начните вводить текст...', minHeight = 200 }: Props) {
+  const isProgrammatic = useRef(false);
+  const onChangeCb = useCallback(onChange, [onChange]);
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -97,7 +100,9 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Нач�
       TableCell,
     ],
     content: value || '',
-    onUpdate: ({ editor }) => onChange(editor.getHTML()),
+    onUpdate: ({ editor }) => {
+      if (!isProgrammatic.current) onChangeCb(editor.getHTML());
+    },
     editorProps: {
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none px-4 py-3',
@@ -110,7 +115,9 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Нач�
     if (!editor) return;
     const current = editor.getHTML();
     if (current !== value && value !== undefined) {
-      editor.commands.setContent(value || '', false);
+      isProgrammatic.current = true;
+      editor.commands.setContent(value || '');
+      isProgrammatic.current = false;
     }
   }, [value, editor]);
 
