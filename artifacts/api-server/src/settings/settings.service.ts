@@ -13,7 +13,7 @@ const DEFAULT_SETTINGS: Array<{ key: string; value: unknown; group: string; labe
   { key: "general.site_name",       value: "КаякРент",                                group: "general",  label: "Имя сайта (вкладка браузера)" },
   { key: "general.site_name_short", value: "КаякРент",                                group: "general",  label: "Короткое название" },
   { key: "general.footer_text",     value: "Аренда байдарок, каноэ и SUP в Москве",  group: "general",  label: "Текст в подвале сайта" },
-  { key: "general.copyright",       value: "КаякРент 2025",                            group: "general",  label: "Copyright строка" },
+  { key: "general.copyright",       value: `КаякРент ${new Date().getFullYear()}`,    group: "general",  label: "Copyright строка" },
 
   // ─── CONTACTS ──────────────────────────────────────────────
   { key: "contacts.phone",          value: "+7 (999) 000-00-00",  group: "contacts", label: "Телефон (основной)" },
@@ -50,7 +50,7 @@ const DEFAULT_SETTINGS: Array<{ key: string; value: unknown; group: string; labe
   { key: "booking.cancellation_hours",       value: 24,    group: "booking", label: "Порог отмены без штрафа (часов до)" },
   { key: "booking.deposit_required",         value: true,  group: "booking", label: "Требовать залог" },
   { key: "booking.deposit_text",             value: "Залог возвращается после сдачи снаряжения в исходном состоянии.", group: "booking", label: "Текст о залоге" },
-  { key: "booking.confirmation_text",        value: "Заказ будет подтверждён менеджером в течение 30 минут.",        group: "booking", label: "Текст о подтверждении менеджером" },
+  { key: "booking.confirmation_text",        value: "Заказ будет подтверждён менеджером в течение 30 минут.", group: "booking", label: "Текст о подтверждении" },
   { key: "booking.show_deposit_on_checkout", value: true,  group: "booking", label: "Показывать залог на странице оформления" },
   { key: "booking.show_delivery_choice",     value: true,  group: "booking", label: "Включить выбор доставки / самовывоза" },
 
@@ -103,9 +103,24 @@ const DEFAULT_SETTINGS: Array<{ key: string; value: unknown; group: string; labe
   { key: "notifications.email_user",           value: "",    group: "notifications", label: "SMTP Логин" },
   { key: "notifications.email_password",       value: "",    group: "notifications", label: "SMTP Пароль" },
   { key: "notifications.email_from",           value: "noreply@kayakrent.ru", group: "notifications", label: "Email отправителя" },
+
+  // ─── CHAT WIDGET ──────────────────────────────────────────────
+  { key: "chat.enabled",            value: true,  group: "chat", label: "Включить чат-виджет" },
+  { key: "chat.show_on_homepage",   value: true,  group: "chat", label: "Показывать на главной" },
+  { key: "chat.show_on_product",    value: true,  group: "chat", label: "Показывать на карточках товаров" },
+  { key: "chat.show_on_sale",       value: true,  group: "chat", label: "Показывать на страницах продажи" },
+  { key: "chat.show_on_tour",       value: true,  group: "chat", label: "Показывать на страницах туров" },
+  { key: "chat.show_on_contacts",   value: true,  group: "chat", label: "Показывать на странице контактов" },
+  { key: "chat.greeting",           value: "Здравствуйте! Чем можем помочь?", group: "chat", label: "Приветственное сообщение" },
+  { key: "chat.offline_message",    value: "Мы сейчас не в сети. Оставьте сообщение — ответим в ближайшее время.", group: "chat", label: "Сообщение в нерабочее время" },
+  { key: "chat.placeholder",        value: "Напишите нам...", group: "chat", label: "Placeholder поля ввода" },
+  { key: "chat.collect_name",       value: false, group: "chat", label: "Собирать имя перед диалогом" },
+  { key: "chat.collect_phone",      value: false, group: "chat", label: "Собирать телефон перед диалогом" },
+  { key: "chat.collect_email",      value: false, group: "chat", label: "Собирать email перед диалогом" },
 ];
 
-const PUBLIC_GROUPS = ["general", "contacts", "branding", "delivery"];
+// Groups returned to public site (no secrets)
+const PUBLIC_GROUPS = ["general", "contacts", "branding", "delivery", "chat"];
 
 @Injectable()
 export class SettingsService {
@@ -120,16 +135,30 @@ export class SettingsService {
   }
 
   async getPublic() {
-    const settings = await this.db
+    const dbSettings = await this.db
       .select()
       .from(settingsTable)
       .where(inArray(settingsTable.group, PUBLIC_GROUPS));
-    return settings.reduce((acc, s) => {
+
+    // Start with defaults so the public site always has values even before initDefaults is called
+    const defaults = DEFAULT_SETTINGS
+      .filter(d => PUBLIC_GROUPS.includes(d.group))
+      .reduce((acc, d) => {
+        if (!d.key.includes("token") && !d.key.includes("secret") && !d.key.includes("password")) {
+          acc[d.key] = d.value;
+        }
+        return acc;
+      }, {} as Record<string, unknown>);
+
+    // DB values override defaults
+    const fromDb = dbSettings.reduce((acc, s) => {
       if (!s.key.includes("token") && !s.key.includes("secret") && !s.key.includes("password")) {
         acc[s.key] = s.value;
       }
       return acc;
     }, {} as Record<string, unknown>);
+
+    return { ...defaults, ...fromDb };
   }
 
   async getByGroup(group: string) {
@@ -137,10 +166,14 @@ export class SettingsService {
       .select()
       .from(settingsTable)
       .where(eq(settingsTable.group, group));
-    return settings.reduce((acc, s) => {
+    const defaults = DEFAULT_SETTINGS
+      .filter(d => d.group === group)
+      .reduce((acc, d) => { acc[d.key] = d.value; return acc; }, {} as Record<string, unknown>);
+    const fromDb = settings.reduce((acc, s) => {
       acc[s.key] = s.value;
       return acc;
     }, {} as Record<string, unknown>);
+    return { ...defaults, ...fromDb };
   }
 
   async get(key: string) {

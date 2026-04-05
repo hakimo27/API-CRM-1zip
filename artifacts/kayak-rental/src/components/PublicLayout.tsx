@@ -4,6 +4,7 @@ import { useCart } from '@/contexts/CartContext';
 import { useQuery } from '@tanstack/react-query';
 import { ShoppingCart, Menu, X, User, Phone, Mail, MessageCircle, MapPin, Clock } from 'lucide-react';
 import { useState } from 'react';
+import ChatWidget from './ChatWidget';
 
 const API = '/api';
 
@@ -19,6 +20,47 @@ function str(v: unknown, fallback = ''): string {
   return (v && typeof v === 'string' && v.trim()) ? v.trim() : fallback;
 }
 
+function bool(v: unknown, fallback = false): boolean {
+  if (v === null || v === undefined) return fallback;
+  if (typeof v === 'boolean') return v;
+  if (v === 'true' || v === 1) return true;
+  if (v === 'false' || v === 0) return false;
+  return fallback;
+}
+
+function LogoMark({ name, logoUrl }: { name: string; logoUrl: string }) {
+  if (logoUrl) {
+    return (
+      <img src={logoUrl} alt={name} className="h-8 w-auto object-contain" />
+    );
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+        <span className="text-white font-bold text-sm leading-none">КР</span>
+      </div>
+      <span className="font-bold text-lg text-gray-900">{name}</span>
+    </div>
+  );
+}
+
+function LogoMarkLight({ name, logoUrl, logoLightUrl }: { name: string; logoUrl: string; logoLightUrl: string }) {
+  const src = logoLightUrl || logoUrl;
+  if (src) {
+    return (
+      <img src={src} alt={name} className="h-8 w-auto object-contain brightness-0 invert" />
+    );
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+        <span className="text-white font-bold text-sm leading-none">КР</span>
+      </div>
+      <span className="font-bold text-lg text-white">{name}</span>
+    </div>
+  );
+}
+
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const { itemCount } = useCart();
@@ -27,7 +69,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const { data: settings = {} } = usePublicSettings();
 
   const companyName  = str(settings['general.company_name'], 'КаякРент');
-  const phone        = str(settings['contacts.phone']);
+  const phone        = str(settings['contacts.phone'], '+7 (999) 000-00-00');
   const phone2       = str(settings['contacts.phone2']);
   const email        = str(settings['contacts.email']);
   const address      = str(settings['contacts.address']);
@@ -36,7 +78,9 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const vkUrl        = str(settings['contacts.vk']);
   const footerText   = str(settings['general.footer_text'], 'Аренда байдарок, каноэ и SUP-досок в Москве и Подмосковье');
   const copyright    = str(settings['general.copyright'], `КаякРент ${new Date().getFullYear()}`);
-  const primaryColor = str(settings['branding.primary_color'], '#2563eb');
+  const logoUrl      = str(settings['branding.logo_url']);
+  const logoLightUrl = str(settings['branding.logo_light_url']);
+  const chatEnabled  = bool(settings['chat.enabled'], true);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -44,9 +88,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2 font-bold text-xl text-blue-700">
-              <span className="text-2xl">🛶</span>
-              <span>{companyName}</span>
+            <Link href="/" className="flex items-center">
+              <LogoMark name={companyName} logoUrl={logoUrl} />
             </Link>
 
             {/* Desktop nav */}
@@ -58,15 +101,13 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
               <Link href="/info/contacts" className="text-gray-700 hover:text-blue-600 transition-colors">Контакты</Link>
             </nav>
 
-            {/* Right side: cart + user */}
+            {/* Right side */}
             <div className="flex items-center gap-2">
-              {phone && (
-                <a href={`tel:${phone.replace(/\D/g, '')}`}
-                  className="hidden lg:flex items-center gap-1.5 text-sm text-gray-600 hover:text-blue-600 transition-colors px-2">
-                  <Phone className="w-4 h-4" />
-                  <span>{phone}</span>
-                </a>
-              )}
+              <a href={`tel:${phone.replace(/\D/g, '')}`}
+                className="hidden lg:flex items-center gap-1.5 text-sm text-gray-600 hover:text-blue-600 transition-colors px-2 font-medium">
+                <Phone className="w-4 h-4" />
+                <span>{phone}</span>
+              </a>
 
               <Link href="/cart" className="relative p-2 text-gray-700 hover:text-blue-600 transition-colors">
                 <ShoppingCart className="w-5 h-5" />
@@ -103,7 +144,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                     </>
                   )}
                 </div>
-              ) : null /* Кнопка "Войти" убрана — основной CTA - бронирование и каталог */}
+              ) : null}
 
               <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden p-2 text-gray-700">
                 {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -120,10 +161,15 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             <Link href="/tours" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-2 px-2 rounded-lg hover:bg-gray-50">Туры</Link>
             <Link href="/info/about" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-2 px-2 rounded-lg hover:bg-gray-50">О нас</Link>
             <Link href="/info/contacts" onClick={() => setMenuOpen(false)} className="block text-gray-700 font-medium py-2 px-2 rounded-lg hover:bg-gray-50">Контакты</Link>
-            {phone && (
-              <a href={`tel:${phone.replace(/\D/g, '')}`} onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-2 text-blue-600 font-medium py-2 px-2 rounded-lg hover:bg-blue-50">
-                <Phone className="w-4 h-4" /> {phone}
+            <div className="border-t border-gray-100 my-2" />
+            <a href={`tel:${phone.replace(/\D/g, '')}`} onClick={() => setMenuOpen(false)}
+              className="flex items-center gap-2 text-blue-600 font-semibold py-2 px-2 rounded-lg hover:bg-blue-50">
+              <Phone className="w-4 h-4" /> {phone}
+            </a>
+            {phone2 && (
+              <a href={`tel:${phone2.replace(/\D/g, '')}`} onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2 text-blue-600 font-medium py-2 px-2 rounded-lg hover:bg-blue-50 text-sm">
+                <Phone className="w-4 h-4" /> {phone2}
               </a>
             )}
             {user && (
@@ -143,11 +189,10 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {/* Brand */}
             <div>
-              <div className="flex items-center gap-2 font-bold text-xl text-white mb-3">
-                <span className="text-2xl">🛶</span>
-                <span>{companyName}</span>
+              <div className="mb-3">
+                <LogoMarkLight name={companyName} logoUrl={logoUrl} logoLightUrl={logoLightUrl} />
               </div>
-              <p className="text-sm text-gray-400 leading-relaxed">{footerText}</p>
+              <p className="text-sm text-gray-400 leading-relaxed mt-3">{footerText}</p>
             </div>
 
             {/* Catalog */}
@@ -177,36 +222,34 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             <div>
               <h3 className="font-semibold text-white mb-3">Контакты</h3>
               <ul className="space-y-2.5 text-sm">
-                {phone && (
-                  <li className="flex items-start gap-2">
-                    <Phone className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <a href={`tel:${phone.replace(/\D/g, '')}`} className="hover:text-white transition-colors block">{phone}</a>
-                      {phone2 && <a href={`tel:${phone2.replace(/\D/g, '')}`} className="hover:text-white transition-colors block">{phone2}</a>}
-                    </div>
-                  </li>
-                )}
+                <li className="flex items-start gap-2">
+                  <Phone className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-400" />
+                  <div>
+                    <a href={`tel:${phone.replace(/\D/g, '')}`} className="hover:text-white transition-colors block font-medium">{phone}</a>
+                    {phone2 && <a href={`tel:${phone2.replace(/\D/g, '')}`} className="hover:text-white transition-colors block text-gray-400">{phone2}</a>}
+                  </div>
+                </li>
                 {email && (
                   <li className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 flex-shrink-0" />
+                    <Mail className="w-4 h-4 flex-shrink-0 text-blue-400" />
                     <a href={`mailto:${email}`} className="hover:text-white transition-colors">{email}</a>
                   </li>
                 )}
                 {address && (
                   <li className="flex items-start gap-2">
-                    <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-400" />
                     <span>{address}</span>
                   </li>
                 )}
                 {schedule && (
                   <li className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 flex-shrink-0" />
+                    <Clock className="w-4 h-4 flex-shrink-0 text-blue-400" />
                     <span>{schedule}</span>
                   </li>
                 )}
                 {tgUsername && (
                   <li className="flex items-center gap-2">
-                    <MessageCircle className="w-4 h-4 flex-shrink-0" />
+                    <MessageCircle className="w-4 h-4 flex-shrink-0 text-blue-400" />
                     <a href={`https://t.me/${tgUsername}`} target="_blank" rel="noopener noreferrer"
                       className="hover:text-white transition-colors">@{tgUsername}</a>
                   </li>
@@ -227,6 +270,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           </div>
         </div>
       </footer>
+
+      {chatEnabled && <ChatWidget />}
     </div>
   );
 }

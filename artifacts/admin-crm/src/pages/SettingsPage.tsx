@@ -160,6 +160,25 @@ const TABS: TabDef[] = [
       { key: 'notifications.email_from',    label: 'Email отправителя', placeholder: 'noreply@kayakrent.ru', hint: 'Адрес "От кого" в письмах' },
     ],
   },
+  {
+    id: 'chat',
+    label: 'Чат-виджет',
+    saveLabel: 'настройки чат-виджета',
+    fields: [
+      { key: 'chat.enabled',          label: 'Включить чат-виджет',                  type: 'boolean',  section: 'Отображение', hint: 'Показывать кнопку чата на сайте' },
+      { key: 'chat.show_on_homepage', label: 'Показывать на главной странице',        type: 'boolean' },
+      { key: 'chat.show_on_product',  label: 'Показывать на страницах товаров',       type: 'boolean' },
+      { key: 'chat.show_on_sale',     label: 'Показывать на страницах продажи',       type: 'boolean' },
+      { key: 'chat.show_on_tour',     label: 'Показывать на страницах туров',         type: 'boolean' },
+      { key: 'chat.show_on_contacts', label: 'Показывать на странице контактов',      type: 'boolean' },
+      { key: 'chat.greeting',         label: 'Приветственное сообщение',             placeholder: 'Здравствуйте! Чем можем помочь?', section: 'Тексты', hint: 'Первое сообщение при открытии чата' },
+      { key: 'chat.offline_message',  label: 'Сообщение в нерабочее время',          type: 'textarea', placeholder: 'Мы сейчас не в сети. Оставьте сообщение — ответим в ближайшее время.', hint: 'Показывается когда операторы не онлайн' },
+      { key: 'chat.placeholder',      label: 'Placeholder поля ввода',               placeholder: 'Напишите нам...' },
+      { key: 'chat.collect_name',     label: 'Запросить имя перед диалогом',         type: 'boolean',  section: 'Сбор данных', hint: 'Перед началом чата просить назвать имя' },
+      { key: 'chat.collect_phone',    label: 'Запросить телефон перед диалогом',     type: 'boolean',  hint: 'Перед началом чата просить оставить номер' },
+      { key: 'chat.collect_email',    label: 'Запросить email перед диалогом',       type: 'boolean',  hint: 'Перед началом чата просить email' },
+    ],
+  },
 ];
 
 // ─── TOAST ────────────────────────────────────────────────────────────────────
