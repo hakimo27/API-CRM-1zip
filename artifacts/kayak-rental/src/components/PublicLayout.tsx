@@ -42,7 +42,7 @@ function LogoMark({ name, logoUrl }: { name: string; logoUrl: string }) {
       <img
         src={logoUrl}
         alt={name}
-        style={{ height: 'clamp(36px, 5vw, 52px)', width: 'auto', maxWidth: '200px', objectFit: 'contain' }}
+        style={{ height: 'clamp(44px, 7vw, 80px)', width: 'auto', maxWidth: '280px', objectFit: 'contain' }}
       />
     );
   }
@@ -50,11 +50,11 @@ function LogoMark({ name, logoUrl }: { name: string; logoUrl: string }) {
     <div className="flex items-center gap-2">
       <div
         className="bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ width: 'clamp(36px, 5vw, 44px)', height: 'clamp(36px, 5vw, 44px)' }}
+        style={{ width: 'clamp(40px, 5vw, 52px)', height: 'clamp(40px, 5vw, 52px)' }}
       >
-        <span className="text-white font-bold leading-none" style={{ fontSize: 'clamp(12px, 1.5vw, 16px)' }}>БД</span>
+        <span className="text-white font-bold leading-none" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>БД</span>
       </div>
-      <span className="font-bold text-gray-900" style={{ fontSize: 'clamp(16px, 2.5vw, 20px)' }}>{name}</span>
+      <span className="font-bold text-gray-900" style={{ fontSize: 'clamp(18px, 2.5vw, 24px)' }}>{name}</span>
     </div>
   );
 }
@@ -66,7 +66,7 @@ function LogoMarkLight({ name, logoUrl, logoLightUrl }: { name: string; logoUrl:
       <img
         src={src}
         alt={name}
-        style={{ height: 'clamp(36px, 5vw, 52px)', width: 'auto', maxWidth: '200px', objectFit: 'contain' }}
+        style={{ height: 'clamp(44px, 7vw, 80px)', width: 'auto', maxWidth: '280px', objectFit: 'contain' }}
       />
     );
   }
@@ -74,11 +74,11 @@ function LogoMarkLight({ name, logoUrl, logoLightUrl }: { name: string; logoUrl:
     <div className="flex items-center gap-2">
       <div
         className="bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ width: 'clamp(36px, 5vw, 44px)', height: 'clamp(36px, 5vw, 44px)' }}
+        style={{ width: 'clamp(40px, 5vw, 52px)', height: 'clamp(40px, 5vw, 52px)' }}
       >
-        <span className="text-white font-bold leading-none" style={{ fontSize: 'clamp(12px, 1.5vw, 16px)' }}>БД</span>
+        <span className="text-white font-bold leading-none" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }}>БД</span>
       </div>
-      <span className="font-bold text-white" style={{ fontSize: 'clamp(16px, 2.5vw, 20px)' }}>{name}</span>
+      <span className="font-bold text-white" style={{ fontSize: 'clamp(18px, 2.5vw, 24px)' }}>{name}</span>
     </div>
   );
 }
@@ -121,7 +121,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
     <div className="min-h-screen flex flex-col bg-gray-50">
       <header className="bg-white shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-16 md:h-20 lg:h-24">
             {/* Logo */}
             <Link href="/" className="flex items-center">
               <LogoMark name={companyName} logoUrl={logoUrl} />
