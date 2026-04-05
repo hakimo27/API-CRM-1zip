@@ -42,19 +42,16 @@ function LogoMark({ name, logoUrl }: { name: string; logoUrl: string }) {
       <img
         src={logoUrl}
         alt={name}
-        style={{ height: 'clamp(56px, 10vw, 130px)', width: 'auto', maxWidth: '360px', objectFit: 'contain' }}
+        style={{ height: '56px', width: 'auto', maxWidth: '320px', objectFit: 'contain' }}
       />
     );
   }
   return (
     <div className="flex items-center gap-2">
-      <div
-        className="bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ width: 'clamp(48px, 7vw, 72px)', height: 'clamp(48px, 7vw, 72px)' }}
-      >
-        <span className="text-white font-bold leading-none" style={{ fontSize: 'clamp(16px, 2.5vw, 24px)' }}>БД</span>
+      <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+        <span className="text-white font-bold text-sm leading-none">БД</span>
       </div>
-      <span className="font-bold text-gray-900" style={{ fontSize: 'clamp(20px, 3vw, 30px)' }}>{name}</span>
+      <span className="font-bold text-lg text-gray-900">{name}</span>
     </div>
   );
 }
@@ -66,7 +63,7 @@ function LogoMarkLight({ name, logoUrl, logoLightUrl }: { name: string; logoUrl:
       <img
         src={src}
         alt={name}
-        style={{ height: 'clamp(56px, 10vw, 130px)', width: 'auto', maxWidth: '360px', objectFit: 'contain' }}
+        style={{ height: '56px', width: 'auto', maxWidth: '320px', objectFit: 'contain' }}
       />
     );
   }
@@ -121,7 +118,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
     <div className="min-h-screen flex flex-col bg-gray-50">
       <header className="bg-white shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-2 md:py-3">
+          <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link href="/" className="flex items-center">
               <LogoMark name={companyName} logoUrl={logoUrl} />
