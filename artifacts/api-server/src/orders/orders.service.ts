@@ -388,19 +388,20 @@ export class OrdersService {
           .sendOrderConfirmation(dto.customerEmail, dto.customerName, created.orderNumber!)
           .catch((e) => this.logger.warn("Customer email failed:", e));
       }
-      const managerEmail = process.env.MANAGER_EMAIL;
-      if (managerEmail) {
-        this.notificationsService
-          .sendNewOrderNotificationToManager(
-            managerEmail,
-            created.orderNumber!,
-            dto.customerName,
-            dto.customerPhone || "",
-            String(finalTotalAmount),
-            "rental"
-          )
-          .catch((e) => this.logger.warn("Manager email failed:", e));
-      }
+      this.notificationsService.getManagerEmail().then((managerEmail) => {
+        if (managerEmail) {
+          this.notificationsService
+            .sendNewOrderNotificationToManager(
+              managerEmail,
+              created.orderNumber!,
+              dto.customerName,
+              dto.customerPhone || "",
+              String(finalTotalAmount),
+              "rental"
+            )
+            .catch((e) => this.logger.warn("Manager email failed:", e));
+        }
+      }).catch(() => {});
     }
 
     return created;

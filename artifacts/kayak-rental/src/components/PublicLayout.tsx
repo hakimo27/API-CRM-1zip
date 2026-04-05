@@ -4,7 +4,7 @@ import { useCart } from '@/contexts/CartContext';
 import { useSaleCart } from '@/contexts/SaleCartContext';
 import { useQuery } from '@tanstack/react-query';
 import { ShoppingCart, ShoppingBag, Menu, X, User, Phone, Mail, MessageCircle, MapPin, Clock } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ChatWidget from './ChatWidget';
 
 const API = '/api';
@@ -100,6 +100,20 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const copyright    = str(settings['general.copyright'], `Байдабаза ${new Date().getFullYear()}`);
   const logoUrl      = mediaUrl(str(settings['branding.logo_url']));
   const logoLightUrl = mediaUrl(str(settings['branding.logo_light_url']));
+  const faviconUrl   = mediaUrl(str(settings['branding.favicon_url']));
+
+  useEffect(() => {
+    if (!faviconUrl) return;
+    const url = faviconUrl + (faviconUrl.includes('?') ? '&' : '?') + '_v=' + Math.floor(Date.now() / 60000);
+    let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.href = url;
+  }, [faviconUrl]);
+
   const chatEnabled          = bool(settings['chat.enabled'], true);
   const chatGreeting         = str(settings['chat.greeting'] as string, 'Здравствуйте! Чем можем помочь?');
   const chatPlaceholder      = str(settings['chat.placeholder'] as string, 'Напишите нам...');

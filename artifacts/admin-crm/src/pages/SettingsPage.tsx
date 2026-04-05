@@ -159,6 +159,7 @@ const TABS: TabDef[] = [
       { key: 'notifications.email_user',    label: 'SMTP Логин',        placeholder: 'user@gmail.com' },
       { key: 'notifications.email_password',label: 'SMTP Пароль',       type: 'password' },
       { key: 'notifications.email_from',    label: 'Email отправителя', placeholder: 'noreply@baidabase.ru', hint: 'Адрес "От кого" в письмах' },
+      { key: 'notifications.manager_email', label: 'Email менеджера', placeholder: 'manager@baidabase.ru', hint: 'Уведомления о новых заказах будут отправлены на этот адрес', section: 'Адреса получателей' },
     ],
   },
   {

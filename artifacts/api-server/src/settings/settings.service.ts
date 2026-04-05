@@ -103,6 +103,7 @@ const DEFAULT_SETTINGS: Array<{ key: string; value: unknown; group: string; labe
   { key: "notifications.email_user",           value: "",    group: "notifications", label: "SMTP Логин" },
   { key: "notifications.email_password",       value: "",    group: "notifications", label: "SMTP Пароль" },
   { key: "notifications.email_from",           value: "noreply@kayakrent.ru", group: "notifications", label: "Email отправителя" },
+  { key: "notifications.manager_email",        value: "",    group: "notifications", label: "Email менеджера (для уведомлений о заказах)" },
 
   // ─── CHAT WIDGET ──────────────────────────────────────────────
   { key: "chat.enabled",            value: true,  group: "chat", label: "Включить чат-виджет" },
