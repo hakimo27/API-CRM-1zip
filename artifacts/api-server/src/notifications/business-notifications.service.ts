@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { DB_TOKEN } from "../database/database.module.js";
 import { notificationLogsTable } from "@workspace/db";
 import { TelegramService } from "../telegram/telegram.service.js";
+import { PushNotificationsService } from "./push-notifications.service.js";
 
 type DrizzleDb = typeof import("@workspace/db").db;
 
@@ -12,6 +13,7 @@ export class BusinessNotificationsService {
     @Inject(DB_TOKEN) private db: DrizzleDb,
     private configService: ConfigService,
     @Optional() private telegramService: TelegramService,
+    @Optional() private pushService: PushNotificationsService,
   ) {}
 
   private get adminChatIds(): string[] {
@@ -73,6 +75,7 @@ export class BusinessNotificationsService {
 
     await this.log("new_rental_order", "system", subject, content, "sent", undefined, order.id);
     await this.sendTelegram(subject, content);
+    this.pushService?.sendNewOrderAlert(num).catch(() => {});
   }
 
   async notifyNewSaleOrder(order: {
@@ -92,22 +95,26 @@ export class BusinessNotificationsService {
 
     await this.log("new_sale_order", "system", subject, content, "sent", undefined, order.id);
     await this.sendTelegram(subject, content);
+    this.pushService?.sendNewSaleOrderAlert(order.id || 0).catch(() => {});
   }
 
   async notifyNewChat(session: {
     id?: number;
     channel?: string;
     metadata?: Record<string, unknown> | null;
+    customerName?: string;
   }) {
     const subject = "Новый диалог";
     const ch = session.channel || "web";
+    const customerName = session.customerName || (session.metadata?.clientName as string);
     const content =
       `Канал: ${ch}\n` +
       `Сессия ID: ${session.id}\n` +
-      (session.metadata?.clientName ? `Клиент: ${session.metadata.clientName}\n` : "");
+      (customerName ? `Клиент: ${customerName}\n` : "");
 
     await this.log("new_chat", "system", subject, content, "sent");
     await this.sendTelegram(subject, content);
+    this.pushService?.sendNewChatAlert(session.id || 0, customerName).catch(() => {});
   }
 
   async notifyNewMessage(session: { id?: number }, message: { content?: string; senderName?: string }) {
@@ -119,5 +126,23 @@ export class BusinessNotificationsService {
 
     await this.log("new_message", "system", subject, content, "sent");
     await this.sendTelegram(subject, content);
+    this.pushService?.sendNewMessageAlert(session.id || 0, message.senderName, message.content).catch(() => {});
+  }
+
+  async notifyNewTourBooking(booking: {
+    id?: number;
+    tourName?: string;
+    customerName?: string;
+    totalAmount?: number | string;
+  }) {
+    const subject = `Новое бронирование тура`;
+    const content =
+      `Тур: ${booking.tourName || "—"}\n` +
+      `Клиент: ${booking.customerName || "—"}\n` +
+      `Сумма: ${booking.totalAmount ? `${Number(booking.totalAmount).toLocaleString("ru")} ₽` : "—"}`;
+
+    await this.log("new_tour_booking", "system", subject, content, "sent");
+    await this.sendTelegram(subject, content);
+    this.pushService?.sendNewTourBookingAlert(booking.id || 0, booking.tourName).catch(() => {});
   }
 }

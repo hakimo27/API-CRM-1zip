@@ -1,20 +1,33 @@
 {
   "name": "Байдабаза CRM",
-  "short_name": "Байдабаза",
+  "short_name": "CRM",
   "description": "Панель управления прокатом водного снаряжения",
   "start_url": "/crm/",
+  "scope": "/crm/",
   "display": "standalone",
   "background_color": "#f9fafb",
   "theme_color": "#2563eb",
   "orientation": "portrait-primary",
+  "lang": "ru",
+  "categories": ["business", "productivity"],
   "icons": [
     {
-      "src": "/crm/favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "/crm/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/crm/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/crm/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
-  ],
-  "categories": ["business", "productivity"],
-  "lang": "ru"
+  ]
 }

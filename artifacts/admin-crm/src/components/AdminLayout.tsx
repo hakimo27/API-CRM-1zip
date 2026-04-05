@@ -3,13 +3,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import {
-  LayoutDashboard, ShoppingBag, Package, Users, Tag, MapPin,
+  LayoutDashboard, ShoppingBag, Package, Users, Tag,
   MessageSquare, Settings, LogOut, Menu, X, User, Waves, ChevronRight,
   Store, FileText, HelpCircle, Star, Activity, Building2,
   BookOpen, ScrollText, Image, ShoppingCart, CalendarCheck, Fish, Layers,
+  Bell, BellOff, Download,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { usePushSubscription } from '@/hooks/usePushSubscription';
+import { usePwaInstall } from '@/hooks/usePwaInstall';
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: 'Супер-администратор',
@@ -133,6 +136,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const qc = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [location] = useLocation();
+  const { status: pushStatus, subscribe: subscribePush } = usePushSubscription();
+  const { canInstall, install: installPwa } = usePwaInstall();
 
   const currentPage = findCurrentPage(location);
   const roleLabel = ROLE_LABELS[user?.role || ''] || user?.role || '';
@@ -251,6 +256,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <MessageSquare className="w-3.5 h-3.5" />
                 Новый чат
               </Link>
+            )}
+            {canInstall && (
+              <button
+                onClick={async () => {
+                  const ok = await installPwa();
+                  if (ok) toast({ title: 'Приложение установлено', description: 'CRM теперь доступен на рабочем столе' });
+                }}
+                title="Установить приложение"
+                className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              >
+                <Download className="w-4 h-4" />
+              </button>
+            )}
+            {pushStatus === 'idle' && (
+              <button
+                onClick={async () => {
+                  const ok = await subscribePush();
+                  if (ok) toast({ title: '🔔 Уведомления включены', description: 'Вы будете получать push-уведомления о новых событиях' });
+                  else toast({ title: 'Уведомления не включены', description: 'Разрешите уведомления в браузере', variant: 'destructive' });
+                }}
+                title="Включить push-уведомления"
+                className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              >
+                <Bell className="w-4 h-4" />
+              </button>
+            )}
+            {pushStatus === 'subscribed' && (
+              <span title="Push-уведомления включены" className="p-1.5 text-green-500">
+                <Bell className="w-4 h-4" />
+              </span>
             )}
             <a href="/" target="_blank" rel="noopener noreferrer"
               className="text-xs text-gray-500 hover:text-blue-600 transition-colors hidden sm:block">

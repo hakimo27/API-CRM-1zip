@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Inject } from "@nestjs/common";
+import { Controller, Get, Post, Body, Query, UseGuards, Inject, Req } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard.js";
+import { Public } from "../common/decorators/public.decorator.js";
 import { Roles } from "../common/decorators/roles.decorator.js";
 import { DB_TOKEN } from "../database/database.module.js";
 import { NotificationsService } from "./notifications.service.js";
+import { PushNotificationsService } from "./push-notifications.service.js";
 import { notificationLogsTable, ordersTable, saleOrdersTable, tourBookingsTable, chatSessionsTable } from "@workspace/db";
 import { desc, eq, and, gt } from "drizzle-orm";
 
@@ -14,6 +16,7 @@ export class NotificationsController {
   constructor(
     @Inject(DB_TOKEN) private db: DrizzleDb,
     private notificationsService: NotificationsService,
+    private pushService: PushNotificationsService,
   ) {}
 
   @Get("logs")
@@ -61,5 +64,45 @@ export class NotificationsController {
       return { success: false, message: "Укажите email для тестовой отправки" };
     }
     return this.notificationsService.sendTestEmail(body.email);
+  }
+
+  // ─── Push Notifications ───────────────────────────────────────────────────
+
+  @Public()
+  @Get("push/vapid-key")
+  getVapidPublicKey() {
+    return { publicKey: this.pushService.getVapidPublicKey() };
+  }
+
+  @Post("push/subscribe")
+  async subscribePush(
+    @Body() body: { endpoint: string; p256dh: string; auth: string },
+    @Req() req: any,
+  ) {
+    const userId = req.user?.id;
+    const userAgent = req.headers?.["user-agent"];
+    const sub = await this.pushService.saveSubscription(
+      { endpoint: body.endpoint, p256dh: body.p256dh, auth: body.auth, userAgent },
+      userId,
+    );
+    return { ok: true, id: sub?.id };
+  }
+
+  @Post("push/unsubscribe")
+  async unsubscribePush(@Body() body: { endpoint: string }) {
+    await this.pushService.removeSubscription(body.endpoint);
+    return { ok: true };
+  }
+
+  @Post("push/test")
+  @Roles("superadmin", "admin")
+  async testPush() {
+    await this.pushService.sendToAll({
+      title: "✅ Тестовый push",
+      body: "Push-уведомления работают корректно",
+      url: "/crm/",
+      tag: "test-push",
+    });
+    return { ok: true };
   }
 }
