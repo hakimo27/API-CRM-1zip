@@ -36,40 +36,19 @@ function bool(v: unknown, fallback = false): boolean {
   return fallback;
 }
 
-function LogoMark({ name, logoUrl }: { name: string; logoUrl: string }) {
-  if (logoUrl) {
-    return (
-      <img src={logoUrl} alt={name} className="h-12 w-auto max-w-[160px] object-contain" />
-    );
-  }
+function LogoMark({ name }: { name: string; logoUrl?: string }) {
   return (
-    <div className="flex items-center gap-2">
-      <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
-        <span className="text-white font-bold text-sm leading-none">БД</span>
-      </div>
-      <span className="font-bold text-lg text-gray-900">{name}</span>
-    </div>
+    <span className="font-bold text-xl sm:text-2xl text-gray-900 tracking-tight leading-none">
+      {name}
+    </span>
   );
 }
 
-function LogoMarkLight({ name, logoUrl, logoLightUrl }: { name: string; logoUrl: string; logoLightUrl: string }) {
-  if (logoLightUrl) {
-    return (
-      <img src={logoLightUrl} alt={name} className="h-12 w-auto max-w-[160px] object-contain" />
-    );
-  }
-  if (logoUrl) {
-    return (
-      <img src={logoUrl} alt={name} className="h-12 w-auto max-w-[160px] object-contain" />
-    );
-  }
+function LogoMarkLight({ name }: { name: string; logoUrl?: string; logoLightUrl?: string }) {
   return (
-    <div className="flex items-center gap-2">
-      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-        <span className="text-white font-bold text-sm leading-none">БД</span>
-      </div>
-      <span className="font-bold text-lg text-white">{name}</span>
-    </div>
+    <span className="font-bold text-xl sm:text-2xl text-white tracking-tight leading-none">
+      {name}
+    </span>
   );
 }
 
