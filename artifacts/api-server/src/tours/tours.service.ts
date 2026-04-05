@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, Inject, BadRequestException } from "@nestjs/common";
-import { eq, and, asc, desc, gte, like, or, sql } from "drizzle-orm";
+import { eq, and, asc, desc, gte, like, or, sql, inArray } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
 import { toursTable, tourDatesTable, tourBookingsTable, usersTable } from "@workspace/db";
 
@@ -49,9 +49,12 @@ export class ToursService {
     const allDates = await this.db
       .select()
       .from(tourDatesTable)
-      .where(and(eq(tourDatesTable.tourId, tour.id), eq(tourDatesTable.status, "planned")))
+      .where(and(
+        eq(tourDatesTable.tourId, tour.id),
+        inArray(tourDatesTable.status, ["planned", "active"]),
+      ))
       .orderBy(asc(tourDatesTable.startDate))
-      .limit(20);
+      .limit(50);
 
     const upcomingDates = allDates.filter(d => {
       try { return d.startDate && new Date(d.startDate) >= now; } catch { return false; }
