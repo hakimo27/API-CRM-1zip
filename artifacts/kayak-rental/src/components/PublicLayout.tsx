@@ -42,16 +42,16 @@ function LogoMark({ name, logoUrl }: { name: string; logoUrl: string }) {
       <img
         src={logoUrl}
         alt={name}
-        style={{ height: '150px', width: 'auto', maxWidth: '500px', objectFit: 'contain' }}
+        style={{ height: '84px', width: 'auto', maxWidth: '420px', objectFit: 'contain' }}
       />
     );
   }
   return (
     <div className="flex items-center gap-2">
-      <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
-        <span className="text-white font-bold text-xl leading-none">БД</span>
+      <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+        <span className="text-white font-bold text-lg leading-none">БД</span>
       </div>
-      <span className="font-bold text-2xl text-gray-900">{name}</span>
+      <span className="font-bold text-xl text-gray-900">{name}</span>
     </div>
   );
 }
@@ -63,7 +63,7 @@ function LogoMarkLight({ name, logoUrl, logoLightUrl }: { name: string; logoUrl:
       <img
         src={src}
         alt={name}
-        style={{ height: '150px', width: 'auto', maxWidth: '500px', objectFit: 'contain' }}
+        style={{ height: '84px', width: 'auto', maxWidth: '420px', objectFit: 'contain' }}
       />
     );
   }
@@ -118,7 +118,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
     <div className="min-h-screen flex flex-col bg-gray-50">
       <header className="bg-white shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between" style={{ height: '170px' }}>
+          <div className="flex items-center justify-between" style={{ height: '100px' }}>
             {/* Logo */}
             <Link href="/" className="flex items-center">
               <LogoMark name={companyName} logoUrl={logoUrl} />
