@@ -7,7 +7,7 @@ Full-featured kayak and outdoor equipment rental platform built as a pnpm monore
 ## Architecture
 
 - **Monorepo**: pnpm workspaces
-- **API**: NestJS (port 8080, path `/api`) — 18 modules
+- **API**: NestJS (port 8080, path `/api`) — 19 modules (+ SeedModule)
 - **Public site**: React 19 + Vite (path `/`) — kayak-rental artifact
 - **Admin CRM**: React 19 + Vite (path `/crm`) — admin-crm artifact
 - **Database**: PostgreSQL + Drizzle ORM
@@ -122,6 +122,51 @@ Sidebar has 8 grouped sections:
 **Контент:** Articles, Pages, FAQ, Reviews, Templates (email/sms), Media (file manager with upload/preview/delete)
 
 **Система:** Settings, Logs (notifications/telegram/chat/errors)
+
+## Docker Deployment (VPS)
+
+### Files
+- `Dockerfile.api` / `Dockerfile.web` / `Dockerfile.admin` — all use `node:20-bookworm-slim` (NOT alpine, due to pnpm musl exclusions)
+- `docker-compose.yml` — full stack: postgres, redis, api, web, admin, nginx
+- `docker/nginx.conf` — HTTP-only default (starts without SSL certs)
+- `docker/nginx-ssl.conf` — HTTPS config (use after `bash deploy/enable-ssl.sh`)
+- `docker/nginx-admin.conf` — admin container internal nginx (serves SPA from root)
+- `deploy/install.sh` — first-install script: builds → starts → migrates → seeds
+- `deploy/enable-ssl.sh` — switches nginx to HTTPS via Let's Encrypt
+
+### Nginx Routing
+- `/api/*` → `api:8080` (NestJS, all routes have `/api` global prefix)
+- `/crm/` → `admin:80/` — **trailing slash strips the /crm prefix** before admin container sees it
+- `= /crm` → `301 /crm/` redirect
+- `/` → `web:80`
+- `/uploads/` → shared `uploads_data` volume
+
+### Redis Auth
+- `REDIS_PASSWORD` is required in `.env.example`
+- Docker-compose healthcheck uses `redis-cli --no-auth-warning -a '${REDIS_PASSWORD:-}' ping`
+- Both empty and non-empty password work correctly
+
+### API Port Exposure
+- API is exposed on `127.0.0.1:8080:8080` (loopback only) for install.sh scripts
+- install.sh uses `curl http://127.0.0.1:8080/api/...` from the host (not inside container)
+- External traffic reaches API only through nginx
+
+### Migrations
+- `drizzle-kit` is in regular `dependencies` in `lib/db/package.json` (not devDependencies)
+- This ensures it's available in the production runtime image with `--prod` install
+- install.sh runs: `docker compose run --rm --no-deps api bash -c "pnpm --filter @workspace/db run push"`
+
+### Demo Seed
+- `POST /api/seed/demo` (requires admin/superadmin auth, guarded by `APP_RUN_DEMO_SEED=true` env)
+- Creates: 5 categories, 4 rental products + 3 sale products, 16 tariffs, 2 branches, 2 tours + 7 tour dates, 3 tariff templates, 2 spec templates
+- Idempotent: skips if categories already exist
+- install.sh calls it automatically when `APP_RUN_DEMO_SEED=true`
+
+### SSL Setup (after first install)
+```bash
+bash deploy/enable-ssl.sh your-domain.ru
+```
+Automates: certbot certonly → copy certs to docker/ssl/ → patch nginx-ssl.conf → switch volume → reload nginx → cron renewal
 
 ## Important Implementation Notes
 

@@ -21,6 +21,7 @@ import { CustomersModule } from "./customers/customers.module.js";
 import { SalesModule } from "./sales/sales.module.js";
 import { MediaModule } from "./media/media.module.js";
 import { TemplatesModule } from "./templates/templates.module.js";
+import { SeedModule } from "./seed/seed.module.js";
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { TemplatesModule } from "./templates/templates.module.js";
     SalesModule,
     MediaModule,
     TemplatesModule,
+    SeedModule,
   ],
 })
 export class AppModule {}

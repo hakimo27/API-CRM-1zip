@@ -8,6 +8,7 @@ volumes:
   postgres_data:
   uploads_data:
   redis_data:
+  certbot_data:
 
 services:
   # ── Redis 7 ──────────────────────────────────────────────────────────────────
@@ -20,15 +21,21 @@ services:
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
       --loglevel warning
+      --save 60 1
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     networks:
       - baydabaza
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      # Works whether REDIS_PASSWORD is set or empty.
+      # redis-cli -a "" with requirepass "" (empty = disabled) returns PONG.
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a '${REDIS_PASSWORD:-}' ping 2>/dev/null | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 5s
 
   # ── PostgreSQL 16 ────────────────────────────────────────────────────────────
   postgres:
@@ -47,6 +54,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   # ── NestJS API ───────────────────────────────────────────────────────────────
   api:
@@ -54,20 +62,24 @@ services:
       context: .
       dockerfile: Dockerfile.api
     restart: unless-stopped
+    # Expose API on loopback only — install.sh uses curl http://localhost:8080
+    # External access goes through nginx (ports 80/443)
+    ports:
+      - "127.0.0.1:8080:8080"
     environment:
       NODE_ENV: production
       PORT: 8080
       DATABASE_URL: postgresql://${POSTGRES_USER:-baydabaza}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-baydabaza}
       REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379
       REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       CACHE_TTL_DEFAULT: ${CACHE_TTL_DEFAULT:-300}
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       SESSION_SECRET: ${SESSION_SECRET}
-      APP_URL: ${APP_URL}
-      ADMIN_URL: ${ADMIN_URL}
+      APP_URL: ${APP_URL:-http://localhost}
+      ADMIN_URL: ${ADMIN_URL:-http://localhost/crm}
       BOOTSTRAP_SUPERADMIN_CREATE: ${BOOTSTRAP_SUPERADMIN_CREATE:-false}
       BOOTSTRAP_SUPERADMIN_EMAIL: ${BOOTSTRAP_SUPERADMIN_EMAIL:-}
       BOOTSTRAP_SUPERADMIN_PASSWORD: ${BOOTSTRAP_SUPERADMIN_PASSWORD:-}
@@ -107,10 +119,12 @@ services:
     volumes:
       - uploads_data:/app/uploads
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/auth/healthz || exit 1"]
+      # Use Node.js built-in http — no curl/wget needed in bookworm-slim
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:8080/api/auth/healthz', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
       interval: 15s
-      timeout: 5s
-      retries: 3
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   # ── Public Website ────────────────────────────────────────────────────────────
   web:
@@ -138,9 +152,12 @@ services:
       - "80:80"
       - "443:443"
     volumes:
+      # Default: HTTP-only config (no certs required).
+      # After SSL setup: bash deploy/enable-ssl.sh YOUR_DOMAIN
       - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./docker/ssl:/etc/nginx/ssl:ro
       - uploads_data:/var/www/uploads:ro
+      - certbot_data:/var/www/certbot:ro
     networks:
       - baydabaza
     depends_on:
