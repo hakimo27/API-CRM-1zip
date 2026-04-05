@@ -73,7 +73,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const { itemCount } = useCart();
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const { data: settings = {} } = usePublicSettings();
+  const { data: settings = {}, isSuccess: settingsLoaded } = usePublicSettings();
 
   const companyName  = str(settings['general.company_name'], 'Байдабаза');
   const phone        = str(settings['contacts.phone'], '+7 (999) 000-00-00');
@@ -283,7 +283,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         </div>
       </footer>
 
-      {chatEnabled && (
+      {settingsLoaded && chatEnabled && (
         <ChatWidget
           enabled={chatEnabled}
           greeting={chatGreeting}

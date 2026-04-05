@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, Shield, Calendar, Minus, Plus, ShoppingCart, Check, Info } from 'lucide-react';
+import { ChevronLeft, Shield, Calendar, Minus, Plus, ShoppingCart, Check, Info, CheckCircle, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useCart } from '@/contexts/CartContext';
 import { differenceInCalendarDays, addDays, format } from 'date-fns';
@@ -22,6 +22,15 @@ interface ProductDetail {
   images: Array<{ id: number; url: string; alt: string | null }>;
 }
 
+interface AvailabilityResult {
+  available: boolean;
+  availableUnits: number;
+  totalUnits: number;
+  requestedQuantity: number;
+  nearestAvailableDate?: string;
+  message?: string;
+}
+
 export default function ProductPage() {
   const { slug } = useParams<{ slug: string }>();
   const [, navigate] = useLocation();
@@ -33,6 +42,7 @@ export default function ProductPage() {
   const [quantity, setQuantity] = useState(1);
   const [selectedTariff, setSelectedTariff] = useState<Tariff | null>(null);
   const [added, setAdded] = useState(false);
+  const [checkEnabled, setCheckEnabled] = useState(false);
 
   const { data: product, isLoading, error } = useQuery<ProductDetail>({
     queryKey: ['product', slug],
@@ -45,14 +55,42 @@ export default function ProductPage() {
     },
   });
 
+  const datesValid = startDate && endDate && new Date(endDate) > new Date(startDate);
+
+  // Auto-check availability whenever dates/quantity change (with a short delay)
+  const [debouncedCheck, setDebouncedCheck] = useState({ productId: 0, startDate, endDate, quantity });
+  useEffect(() => {
+    if (!product || !datesValid) return;
+    const t = setTimeout(() => {
+      setDebouncedCheck({ productId: product.id, startDate, endDate, quantity });
+      setCheckEnabled(true);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [product?.id, startDate, endDate, quantity, datesValid]);
+
+  const {
+    data: availability,
+    isFetching: checkingAvailability,
+  } = useQuery<AvailabilityResult>({
+    queryKey: ['availability', debouncedCheck],
+    queryFn: () => api.get(
+      `/availability?productId=${debouncedCheck.productId}&startDate=${debouncedCheck.startDate}&endDate=${debouncedCheck.endDate}&quantity=${debouncedCheck.quantity}`
+    ),
+    enabled: checkEnabled && debouncedCheck.productId > 0,
+    staleTime: 30 * 1000,
+  });
+
   const days = startDate && endDate
     ? Math.max(1, differenceInCalendarDays(new Date(endDate), new Date(startDate)))
     : 1;
 
   const price = selectedTariff ? selectedTariff.pricePerDay * days * quantity : 0;
 
+  const isAvailable = !availability || availability.available;
+  const canAddToCart = !!selectedTariff && datesValid && isAvailable;
+
   const handleAddToCart = () => {
-    if (!product || !selectedTariff) return;
+    if (!product || !selectedTariff || !canAddToCart) return;
     addItem({
       productId: product.id,
       slug: product.slug,
@@ -208,7 +246,7 @@ export default function ProductPage() {
                 type="date"
                 value={startDate}
                 min={format(addDays(today, 1), 'yyyy-MM-dd')}
-                onChange={e => setStartDate(e.target.value)}
+                onChange={e => { setStartDate(e.target.value); setCheckEnabled(false); }}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
             </div>
@@ -218,27 +256,89 @@ export default function ProductPage() {
                 type="date"
                 value={endDate}
                 min={startDate || format(addDays(today, 2), 'yyyy-MM-dd')}
-                onChange={e => setEndDate(e.target.value)}
+                onChange={e => { setEndDate(e.target.value); setCheckEnabled(false); }}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
             </div>
           </div>
 
           {/* Quantity */}
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center gap-4 mb-4">
             <span className="text-sm font-medium text-gray-700">Количество:</span>
             <div className="flex items-center gap-2">
-              <button onClick={() => setQuantity(q => Math.max(1, q - 1))}
+              <button onClick={() => { setQuantity(q => Math.max(1, q - 1)); setCheckEnabled(false); }}
                 className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-100">
                 <Minus className="w-4 h-4" />
               </button>
               <span className="w-8 text-center font-medium">{quantity}</span>
-              <button onClick={() => setQuantity(q => q + 1)}
+              <button onClick={() => { setQuantity(q => q + 1); setCheckEnabled(false); }}
                 className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-100">
                 <Plus className="w-4 h-4" />
               </button>
             </div>
           </div>
+
+          {/* Availability status */}
+          {datesValid && (
+            <div className={`mb-4 rounded-xl px-4 py-3 flex items-start gap-3 text-sm transition-all ${
+              checkingAvailability
+                ? 'bg-gray-50 border border-gray-200'
+                : !availability
+                ? 'bg-gray-50 border border-gray-200'
+                : availability.available
+                ? 'bg-green-50 border border-green-200'
+                : 'bg-red-50 border border-red-200'
+            }`}>
+              {checkingAvailability ? (
+                <>
+                  <Loader2 className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0 mt-0.5" />
+                  <span className="text-gray-500">Проверяем доступность...</span>
+                </>
+              ) : !availability ? (
+                <>
+                  <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-gray-500">Выберите даты для проверки доступности</span>
+                </>
+              ) : availability.available ? (
+                <>
+                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-green-700 font-medium">Доступно</span>
+                    <span className="text-green-600 ml-1">
+                      ({availability.availableUnits} из {availability.totalUnits} шт.)
+                    </span>
+                    {availability.availableUnits <= 2 && availability.availableUnits > 0 && (
+                      <div className="flex items-center gap-1 mt-0.5 text-amber-600">
+                        <AlertTriangle className="w-3 h-3" />
+                        <span className="text-xs">Осталось мало — бронируйте скорее</span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-red-700 font-medium">Нет на выбранные даты</span>
+                    <div className="text-red-600 text-xs mt-0.5">
+                      Доступно {availability.availableUnits} шт., запрошено {availability.requestedQuantity} шт.
+                    </div>
+                    {availability.nearestAvailableDate && (
+                      <div className="text-xs text-gray-600 mt-1">
+                        Ближайшая свободная дата:{' '}
+                        <button
+                          onClick={() => setStartDate(availability.nearestAvailableDate!)}
+                          className="text-blue-600 hover:underline font-medium"
+                        >
+                          {new Date(availability.nearestAvailableDate).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' })}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Price + CTA */}
           <div className="bg-gray-50 rounded-2xl p-4 mb-4">
@@ -256,15 +356,24 @@ export default function ProductPage() {
 
           <button
             onClick={handleAddToCart}
-            disabled={!selectedTariff}
+            disabled={!canAddToCart}
             className={`w-full flex items-center justify-center gap-2 py-4 rounded-xl font-semibold text-lg transition-all ${
               added
                 ? 'bg-green-600 text-white'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                : canAddToCart
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : !isAvailable && availability
+                ? 'bg-red-100 text-red-500 cursor-not-allowed'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
           >
-            {added ? <Check className="w-5 h-5" /> : <ShoppingCart className="w-5 h-5" />}
-            {added ? 'Добавлено в корзину!' : 'Добавить в корзину'}
+            {added ? (
+              <><Check className="w-5 h-5" /> Добавлено в корзину!</>
+            ) : !isAvailable && availability ? (
+              <><XCircle className="w-5 h-5" /> Нет на выбранные даты</>
+            ) : (
+              <><ShoppingCart className="w-5 h-5" /> Добавить в корзину</>
+            )}
           </button>
         </div>
       </div>

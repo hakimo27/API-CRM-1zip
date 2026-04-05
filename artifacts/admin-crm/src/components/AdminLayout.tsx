@@ -1,5 +1,7 @@
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import {
   LayoutDashboard, ShoppingBag, Package, Users, Tag, MapPin,
   MessageSquare, Settings, LogOut, Menu, X, User, Waves, ChevronRight,
@@ -18,15 +20,23 @@ const ROLE_LABELS: Record<string, string> = {
   user: 'Пользователь',
 };
 
-const NAV_GROUPS = [
+interface NavItemDef {
+  href: string;
+  label: string;
+  icon: React.FC<any>;
+  exact?: boolean;
+  countKey?: string;
+}
+
+const NAV_GROUPS: Array<{ label: string; items: NavItemDef[] }> = [
   {
     label: 'Операции',
     items: [
       { href: '/', label: 'Дашборд', icon: LayoutDashboard, exact: true },
-      { href: '/orders', label: 'Заказы аренды', icon: ShoppingBag },
-      { href: '/sale-orders', label: 'Заказы продажи', icon: ShoppingCart },
-      { href: '/tour-bookings', label: 'Бронирования туров', icon: CalendarCheck },
-      { href: '/chat', label: 'Чат', icon: MessageSquare },
+      { href: '/orders', label: 'Заказы аренды', icon: ShoppingBag, countKey: 'newOrders' },
+      { href: '/sale-orders', label: 'Заказы продажи', icon: ShoppingCart, countKey: 'newSaleOrders' },
+      { href: '/tour-bookings', label: 'Бронирования туров', icon: CalendarCheck, countKey: 'pendingBookings' },
+      { href: '/chat', label: 'Чат', icon: MessageSquare, countKey: 'unreadChats' },
     ],
   },
   {
@@ -72,10 +82,20 @@ const NAV_GROUPS = [
   },
 ];
 
-function NavItem({ item }: { item: { href: string; label: string; icon: React.FC<any>; exact?: boolean } }) {
+function Badge({ count }: { count: number }) {
+  if (!count) return null;
+  return (
+    <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 leading-none flex-shrink-0">
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
+
+function NavItem({ item, counts }: { item: NavItemDef; counts: Record<string, number> }) {
   const [location] = useLocation();
   const active = item.exact ? location === item.href : location.startsWith(item.href);
   const Icon = item.icon;
+  const count = item.countKey ? (counts[item.countKey] || 0) : 0;
 
   return (
     <Link href={item.href}
@@ -83,8 +103,15 @@ function NavItem({ item }: { item: { href: string; label: string; icon: React.FC
         active ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
       }`}>
       <Icon className="w-4 h-4 flex-shrink-0" />
-      {item.label}
-      {active && <ChevronRight className="w-3.5 h-3.5 ml-auto" />}
+      <span className="flex-1 truncate">{item.label}</span>
+      {active && !count && <ChevronRight className="w-3.5 h-3.5 ml-auto flex-shrink-0" />}
+      {count > 0 && (
+        <span className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold px-1 leading-none flex-shrink-0 ${
+          active ? 'bg-white text-blue-600' : 'bg-red-500 text-white'
+        }`}>
+          {count > 99 ? '99+' : count}
+        </span>
+      )}
     </Link>
   );
 }
@@ -105,6 +132,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const currentPage = findCurrentPage(location);
   const roleLabel = ROLE_LABELS[user?.role || ''] || user?.role || '';
+
+  const { data: counts = { newOrders: 0, newSaleOrders: 0, pendingBookings: 0, unreadChats: 0 } } = useQuery({
+    queryKey: ['crm-counts'],
+    queryFn: () => api.get<Record<string, number>>('/notifications/counts'),
+    refetchInterval: 30 * 1000,
+    staleTime: 15 * 1000,
+  });
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -135,7 +169,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 {group.label}
               </p>
               <div className="space-y-0.5">
-                {group.items.map(item => <NavItem key={item.href} item={item} />)}
+                {group.items.map(item => <NavItem key={item.href} item={item} counts={counts} />)}
               </div>
             </div>
           ))}

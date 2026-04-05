@@ -16,6 +16,7 @@ import TourBookingDetailPage from '@/pages/TourBookingDetailPage';
 import InventoryPage from '@/pages/InventoryPage';
 import ProductsPage from '@/pages/ProductsPage';
 import CustomersPage from '@/pages/CustomersPage';
+import CustomerDetailPage from '@/pages/CustomerDetailPage';
 import ToursPage from '@/pages/ToursPage';
 import ChatPage from '@/pages/ChatPage';
 import UsersPage from '@/pages/UsersPage';
@@ -86,6 +87,7 @@ function CrmRoutes() {
       <Route path="/tours"><G><ToursPage /></G></Route>
 
       {/* Customers */}
+      <Route path="/customers/:id">{(p) => <G><CustomerDetailPage id={p.id} /></G>}</Route>
       <Route path="/customers"><G><CustomersPage /></G></Route>
       <Route path="/branches"><G><BranchesPage /></G></Route>
 

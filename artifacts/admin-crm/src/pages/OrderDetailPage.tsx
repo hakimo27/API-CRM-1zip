@@ -530,7 +530,7 @@ export default function OrderDetailPage({ id }: { id: string }) {
                 </div>
               )}
               {order.customer && (
-                <Link href={`/customers`} className="text-xs text-blue-600 hover:underline">
+                <Link href={`/customers/${order.customer.id}`} className="text-xs text-blue-600 hover:underline">
                   Открыть карточку клиента →
                 </Link>
               )}

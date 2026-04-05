@@ -33,19 +33,17 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-async function resolveSessionId(customerName?: string, customerPhone?: string, customerEmail?: string): Promise<number> {
-  const stored = localStorage.getItem(SESSION_KEY);
-  if (stored) {
-    const id = parseInt(stored, 10);
-    if (!isNaN(id)) {
-      try {
-        await apiFetch<ChatMessage[]>(`/chat/sessions/${id}/messages/public`);
-        return id;
-      } catch {
-        localStorage.removeItem(SESSION_KEY);
-      }
-    }
+function getStoredSessionId(): number | null {
+  try {
+    const stored = localStorage.getItem(SESSION_KEY);
+    const id = stored ? parseInt(stored, 10) : NaN;
+    return isNaN(id) ? null : id;
+  } catch {
+    return null;
   }
+}
+
+async function createSession(customerName?: string, customerPhone?: string, customerEmail?: string): Promise<number> {
   const session = await apiFetch<{ id: number; status: string }>("/chat/sessions", {
     method: "POST",
     body: JSON.stringify({
@@ -65,6 +63,15 @@ async function resolveSessionId(customerName?: string, customerPhone?: string, c
   return session.id;
 }
 
+async function validateSession(id: number): Promise<boolean> {
+  try {
+    await apiFetch<ChatMessage[]>(`/chat/sessions/${id}/messages/public`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const QUICK_REPLIES = ["Аренда байдарки", "Цены и тарифы", "Доставка", "Туры"];
 
 export default function ChatWidget({
@@ -77,19 +84,24 @@ export default function ChatWidget({
 }: ChatWidgetProps) {
   const needsPreForm = collectName || collectPhone || collectEmail;
 
+  // Determine initial phase: if there's an existing session, skip pre-chat form
+  const storedId = getStoredSessionId();
+  const hasExistingSession = storedId !== null;
+
   const [open, setOpen] = useState(false);
-  const [phase, setPhase] = useState<"pre-chat" | "chat">(needsPreForm ? "pre-chat" : "chat");
+  // CRITICAL: phase depends on both needsPreForm AND whether an existing session exists
+  // If existing session → "chat" always (no need to re-collect info)
+  // If no session AND needsPreForm → "pre-chat"
+  // If no session AND !needsPreForm → "chat" (session created on open)
+  const [phase, setPhase] = useState<"pre-chat" | "chat">(
+    needsPreForm && !hasExistingSession ? "pre-chat" : "chat"
+  );
   const [leadName, setLeadName] = useState("");
   const [leadPhone, setLeadPhone] = useState("");
   const [leadEmail, setLeadEmail] = useState("");
   const [leadError, setLeadError] = useState("");
 
-  const [sessionId, setSessionId] = useState<number | null>(() => {
-    if (needsPreForm) return null;
-    const stored = localStorage.getItem(SESSION_KEY);
-    const id = stored ? parseInt(stored, 10) : NaN;
-    return isNaN(id) ? null : id;
-  });
+  const [sessionId, setSessionId] = useState<number | null>(storedId);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -97,6 +109,23 @@ export default function ChatWidget({
   const [sendError, setSendError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Sync phase when needsPreForm changes (handles late-loading settings)
+  const initialized = useRef(false);
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    const stored = getStoredSessionId();
+    if (stored !== null) {
+      // Has existing session - always go to chat phase, regardless of needsPreForm
+      setSessionId(stored);
+      setPhase("chat");
+    } else if (needsPreForm) {
+      setPhase("pre-chat");
+    } else {
+      setPhase("chat");
+    }
+  }, [needsPreForm]);
 
   const fetchMessages = useCallback(async (sid: number) => {
     try {
@@ -123,10 +152,23 @@ export default function ChatWidget({
 
   async function openChat() {
     setOpen(true);
-    if (!needsPreForm && !sessionId) {
+    if (phase === "chat" && !sessionId) {
+      // No pre-form needed and no session — create one now
       setLoading(true);
       try {
-        const sid = await resolveSessionId();
+        const stored = getStoredSessionId();
+        if (stored) {
+          const valid = await validateSession(stored);
+          if (valid) {
+            setSessionId(stored);
+            await fetchMessages(stored);
+            setLoading(false);
+            return;
+          } else {
+            localStorage.removeItem(SESSION_KEY);
+          }
+        }
+        const sid = await createSession();
         setSessionId(sid);
         await fetchMessages(sid);
       } catch (e) {
@@ -146,7 +188,21 @@ export default function ChatWidget({
 
     setLoading(true);
     try {
-      const sid = await resolveSessionId(
+      // Check if there's already a valid session in localStorage
+      const stored = getStoredSessionId();
+      if (stored) {
+        const valid = await validateSession(stored);
+        if (valid) {
+          setSessionId(stored);
+          await fetchMessages(stored);
+          setPhase("chat");
+          setLoading(false);
+          return;
+        } else {
+          localStorage.removeItem(SESSION_KEY);
+        }
+      }
+      const sid = await createSession(
         leadName || undefined,
         leadPhone || undefined,
         leadEmail || undefined,

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, Inject } from "@nestjs/common";
-import { eq, desc, like, or } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
-import { customersTable, ordersTable } from "@workspace/db";
+import { customersTable, ordersTable, chatSessionsTable } from "@workspace/db";
 
 type DrizzleDb = typeof import("@workspace/db").db;
 
@@ -43,14 +43,26 @@ export class CustomersService {
 
     if (!customer) throw new NotFoundException("Клиент не найден");
 
-    const orders = await this.db
-      .select()
-      .from(ordersTable)
-      .where(eq(ordersTable.customerId, id))
-      .orderBy(desc(ordersTable.createdAt))
-      .limit(10);
+    const [orders, chatSessions] = await Promise.all([
+      this.db
+        .select()
+        .from(ordersTable)
+        .where(eq(ordersTable.customerId, id))
+        .orderBy(desc(ordersTable.createdAt))
+        .limit(20),
+      this.db
+        .select()
+        .from(chatSessionsTable)
+        .where(eq(chatSessionsTable.customerId, id))
+        .orderBy(desc(chatSessionsTable.createdAt))
+        .limit(10),
+    ]);
 
-    return { ...customer, orders };
+    const totalOrders = orders.length;
+    const totalRevenue = orders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+    const activeOrders = orders.filter(o => !["cancelled", "completed", "refunded"].includes(o.status)).length;
+
+    return { ...customer, orders, chatSessions, stats: { totalOrders, totalRevenue, activeOrders } };
   }
 
   async findByPhone(phone: string) {
