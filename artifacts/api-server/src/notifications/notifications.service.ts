@@ -132,20 +132,31 @@ export class NotificationsService {
   // ─── Sender helpers ───────────────────────────────────────────────────────
 
   private async getFrom(): Promise<string> {
-    const name = this.configService.get<string>("EMAIL_FROM_NAME") || "КаякРент";
+    // 1. Display name: env var → company name from settings (never hardcoded brand)
+    let name = this.configService.get<string>("EMAIL_FROM_NAME") || "";
+    if (!name) {
+      name = await this.getCompanyName();
+    }
+
+    // 2. Sender email: env var → DB settings email_from → DB settings email_user (SMTP login)
     let email = this.configService.get<string>("SMTP_FROM") || this.configService.get<string>("EMAIL_FROM") || "";
     if (!email && this.settingsService) {
-      const raw = await this.settingsService.get("notifications.email_from").catch(() => null);
-      email = typeof raw === "string" ? raw.replace(/^"|"$/g, "").trim() : "";
+      const rawFrom = await this.settingsService.get("notifications.email_from").catch(() => null);
+      email = typeof rawFrom === "string" ? rawFrom.replace(/^"|"$/g, "").trim() : "";
     }
-    return `"${name}" <${email || "noreply@kayakrent.ru"}>`;
+    if (!email && this.settingsService) {
+      const rawUser = await this.settingsService.get("notifications.email_user").catch(() => null);
+      email = typeof rawUser === "string" ? rawUser.replace(/^"|"$/g, "").trim() : "";
+    }
+
+    return email ? `"${name}" <${email}>` : name;
   }
 
   private getSiteUrl(): string {
     return (
       this.configService.get<string>("APP_URL") ||
       this.configService.get<string>("SITE_URL") ||
-      "https://kayakrent.ru"
+      ""
     );
   }
 
@@ -394,13 +405,14 @@ ${opts.preheader ? `<div style="display:none;font-size:1px;color:#f1f5f9;max-hei
 
     try {
       const from = await this.getFrom();
+      const company = await this.getCompanyName();
       await transport.sendMail({
         from,
         to: toEmail,
-        subject: "Тестовое письмо — КаякРент",
+        subject: `Тестовое письмо — ${company}`,
         html: `
           <h2>Тест SMTP ✓</h2>
-          <p>Это тестовое письмо от КаякРент.</p>
+          <p>Это тестовое письмо от ${company}.</p>
           <p>Если вы получили его, настройки SMTP работают корректно.</p>
           <hr/>
           <p style="color:#666;font-size:12px">Конфигурация: ${cfg.host}:${cfg.port} (secure=${cfg.secure}) | From: ${cfg.from}</p>

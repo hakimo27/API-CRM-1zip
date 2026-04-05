@@ -7,18 +7,18 @@ type DrizzleDb = typeof import("@workspace/db").db;
 
 const DEFAULT_SETTINGS: Array<{ key: string; value: unknown; group: string; label?: string }> = [
   // ─── GENERAL ───────────────────────────────────────────────
-  { key: "general.company_name",    value: "КаякРент",                                group: "general",  label: "Название компании" },
+  { key: "general.company_name",    value: "Байдабаза",                               group: "general",  label: "Название компании" },
   { key: "general.company_slogan",  value: "Аренда водного снаряжения",                group: "general",  label: "Слоган" },
   { key: "general.tagline",         value: "Лучший прокат байдарок и каяков",           group: "general",  label: "Подзаголовок" },
-  { key: "general.site_name",       value: "КаякРент",                                group: "general",  label: "Имя сайта (вкладка браузера)" },
-  { key: "general.site_name_short", value: "КаякРент",                                group: "general",  label: "Короткое название" },
+  { key: "general.site_name",       value: "Байдабаза",                               group: "general",  label: "Имя сайта (вкладка браузера)" },
+  { key: "general.site_name_short", value: "Байдабаза",                               group: "general",  label: "Короткое название" },
   { key: "general.footer_text",     value: "Аренда байдарок, каноэ и SUP в Москве",  group: "general",  label: "Текст в подвале сайта" },
-  { key: "general.copyright",       value: `КаякРент ${new Date().getFullYear()}`,    group: "general",  label: "Copyright строка" },
+  { key: "general.copyright",       value: `Байдабаза ${new Date().getFullYear()}`,   group: "general",  label: "Copyright строка" },
 
   // ─── CONTACTS ──────────────────────────────────────────────
   { key: "contacts.phone",          value: "+7 (999) 000-00-00",  group: "contacts", label: "Телефон (основной)" },
   { key: "contacts.phone2",         value: "",                     group: "contacts", label: "Телефон (дополнительный)" },
-  { key: "contacts.email",          value: "info@kayakrent.ru",    group: "contacts", label: "Email" },
+  { key: "contacts.email",          value: "",                     group: "contacts", label: "Email" },
   { key: "contacts.address",        value: "г. Москва",            group: "contacts", label: "Адрес" },
   { key: "contacts.city",           value: "Москва",               group: "contacts", label: "Город" },
   { key: "contacts.schedule",       value: "Пн–Вс: 09:00–21:00",  group: "contacts", label: "График работы" },
@@ -102,7 +102,7 @@ const DEFAULT_SETTINGS: Array<{ key: string; value: unknown; group: string; labe
   { key: "notifications.email_port",           value: 587,   group: "notifications", label: "SMTP Port" },
   { key: "notifications.email_user",           value: "",    group: "notifications", label: "SMTP Логин" },
   { key: "notifications.email_password",       value: "",    group: "notifications", label: "SMTP Пароль" },
-  { key: "notifications.email_from",           value: "noreply@kayakrent.ru", group: "notifications", label: "Email отправителя" },
+  { key: "notifications.email_from",           value: "",    group: "notifications", label: "Email отправителя" },
   { key: "notifications.manager_email",        value: "",    group: "notifications", label: "Email менеджера (для уведомлений о заказах)" },
 
   // ─── CHAT WIDGET ──────────────────────────────────────────────
