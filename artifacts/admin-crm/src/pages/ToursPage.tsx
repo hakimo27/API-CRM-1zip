@@ -46,9 +46,10 @@ function Field({ label, children, col2 }: { label: string; children: React.React
   );
 }
 
-function TagListEditor({ items, onChange, placeholder, color }: {
-  items: string[]; onChange: (v: string[]) => void; placeholder?: string; color: 'green' | 'red';
+function TagListEditor({ items: rawItems, onChange, placeholder, color }: {
+  items: string[] | undefined; onChange: (v: string[]) => void; placeholder?: string; color: 'green' | 'red';
 }) {
+  const items = rawItems ?? [];
   const [input, setInput] = useState('');
   const add = () => {
     const v = input.trim();
@@ -98,13 +99,7 @@ function PhotoUpload({ value, onChange }: { value: string; onChange: (url: strin
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch('/api/media/upload?folder=tours', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
-      if (!res.ok) throw new Error('Ошибка загрузки');
-      const data = await res.json();
+      const data = await api.upload<{ url: string }>('/media/upload?folder=tours', formData);
       onChange(data.url);
     } catch {
       toast({ title: 'Ошибка загрузки фото', variant: 'destructive' });
