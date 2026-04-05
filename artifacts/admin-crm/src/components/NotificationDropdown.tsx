@@ -1,6 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { Bell, MessageSquare, ShoppingBag, ShoppingCart, CalendarCheck, X, CheckCheck } from 'lucide-react';
+import {
+  Bell, MessageSquare, ShoppingBag, ShoppingCart,
+  CalendarCheck, X, ChevronRight,
+} from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
@@ -12,22 +15,38 @@ interface NotificationLog {
   createdAt: string;
 }
 
-const LAST_SEEN_KEY = 'crm_notifications_last_seen';
+interface Counts {
+  newOrders: number;
+  newSaleOrders: number;
+  pendingBookings: number;
+  unreadChats: number;
+}
 
 function typeConfig(type: string) {
   switch (type) {
     case 'new_chat':
-      return { icon: MessageSquare, color: 'text-blue-500', bg: 'bg-blue-50', label: 'Новый чат', href: '/chat' };
+      return { icon: MessageSquare, color: 'text-blue-500', bg: 'bg-blue-50', label: 'Новый чат' };
     case 'new_message':
-      return { icon: MessageSquare, color: 'text-blue-400', bg: 'bg-blue-50', label: 'Сообщение', href: '/chat' };
+      return { icon: MessageSquare, color: 'text-blue-400', bg: 'bg-blue-50', label: 'Сообщение' };
     case 'new_rental_order':
-      return { icon: ShoppingBag, color: 'text-green-500', bg: 'bg-green-50', label: 'Заказ аренды', href: '/orders' };
+      return { icon: ShoppingBag, color: 'text-green-500', bg: 'bg-green-50', label: 'Заказ аренды' };
     case 'new_sale_order':
-      return { icon: ShoppingCart, color: 'text-violet-500', bg: 'bg-violet-50', label: 'Заказ магазина', href: '/sale-orders' };
+      return { icon: ShoppingCart, color: 'text-violet-500', bg: 'bg-violet-50', label: 'Заказ магазина' };
     case 'new_tour_booking':
-      return { icon: CalendarCheck, color: 'text-amber-500', bg: 'bg-amber-50', label: 'Бронирование тура', href: '/tour-bookings' };
+      return { icon: CalendarCheck, color: 'text-amber-500', bg: 'bg-amber-50', label: 'Бронирование тура' };
     default:
-      return { icon: Bell, color: 'text-gray-400', bg: 'bg-gray-50', label: 'Уведомление', href: '/' };
+      return { icon: Bell, color: 'text-gray-400', bg: 'bg-gray-50', label: 'Уведомление' };
+  }
+}
+
+function typeHref(type: string): string {
+  switch (type) {
+    case 'new_chat':
+    case 'new_message':   return '/chat';
+    case 'new_rental_order': return '/orders';
+    case 'new_sale_order':   return '/sale-orders';
+    case 'new_tour_booking': return '/tour-bookings';
+    default: return '/';
   }
 }
 
@@ -44,38 +63,81 @@ export function NotificationDropdown() {
   const [, navigate] = useLocation();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const [lastSeen, setLastSeen] = useState<number>(() => {
-    try { return Number(localStorage.getItem(LAST_SEEN_KEY) || '0'); } catch { return 0; }
+  // ── Shared query with AdminLayout (same key → no duplicate fetch) ──────────
+  const { data: counts = { newOrders: 0, newSaleOrders: 0, pendingBookings: 0, unreadChats: 0 } } =
+    useQuery<Counts>({
+      queryKey: ['crm-counts'],
+      queryFn: () => api.get<Counts>('/notifications/counts'),
+      refetchInterval: 8_000,
+      staleTime: 4_000,
+    });
+
+  // ── Separate chat/sessions/unread endpoint as requested ───────────────────
+  const { data: chatUnreadData } = useQuery<{ unread: number }>({
+    queryKey: ['chat-unread'],
+    queryFn: () => api.get<{ unread: number }>('/chat/sessions/unread'),
+    refetchInterval: 8_000,
+    staleTime: 4_000,
   });
 
+  // ── Recent notification log ───────────────────────────────────────────────
   const { data: notifications = [] } = useQuery<NotificationLog[]>({
     queryKey: ['notifications-recent'],
-    queryFn: () => api.get<NotificationLog[]>('/notifications/recent?limit=30'),
+    queryFn: () => api.get<NotificationLog[]>('/notifications/recent?limit=20'),
     refetchInterval: 15_000,
     staleTime: 10_000,
   });
 
-  // Count unread (created after lastSeen)
-  const unreadCount = notifications.filter(
-    n => new Date(n.createdAt).getTime() > lastSeen
-  ).length;
+  // ── Total badge = sum of all actionable items ─────────────────────────────
+  // Use chat/sessions/unread data if available, fall back to counts.unreadChats
+  const chatCount = chatUnreadData?.unread ?? counts.unreadChats ?? 0;
+  const totalBadge =
+    (counts.newOrders ?? 0) +
+    (counts.newSaleOrders ?? 0) +
+    (counts.pendingBookings ?? 0) +
+    chatCount;
 
-  const markAllRead = useCallback(() => {
-    const now = Date.now();
-    setLastSeen(now);
-    try { localStorage.setItem(LAST_SEEN_KEY, String(now)); } catch {}
-  }, []);
+  // ── Actionable quick-links (only non-zero items) ─────────────────────────
+  const actionItems = [
+    {
+      label: 'Заказы аренды',
+      count: counts.newOrders ?? 0,
+      href: '/orders',
+      Icon: ShoppingBag,
+      colorText: 'text-green-600',
+      colorBg: 'bg-green-50',
+      badgeBg: 'bg-green-100 text-green-700',
+    },
+    {
+      label: 'Заказы магазина',
+      count: counts.newSaleOrders ?? 0,
+      href: '/sale-orders',
+      Icon: ShoppingCart,
+      colorText: 'text-violet-600',
+      colorBg: 'bg-violet-50',
+      badgeBg: 'bg-violet-100 text-violet-700',
+    },
+    {
+      label: 'Бронирования',
+      count: counts.pendingBookings ?? 0,
+      href: '/tour-bookings',
+      Icon: CalendarCheck,
+      colorText: 'text-amber-600',
+      colorBg: 'bg-amber-50',
+      badgeBg: 'bg-amber-100 text-amber-700',
+    },
+    {
+      label: 'Чаты с клиентами',
+      count: chatCount,
+      href: '/chat',
+      Icon: MessageSquare,
+      colorText: 'text-blue-600',
+      colorBg: 'bg-blue-50',
+      badgeBg: 'bg-blue-100 text-blue-700',
+    },
+  ].filter(item => item.count > 0);
 
-  // Mark as read when dropdown opens
-  useEffect(() => {
-    if (open && unreadCount > 0) {
-      // Delay slightly so unread count is visible before reset
-      const timer = setTimeout(markAllRead, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [open]);
-
-  // Close on outside click
+  // ── Close on outside click ────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -87,113 +149,135 @@ export function NotificationDropdown() {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const handleNotificationClick = (n: NotificationLog) => {
-    const cfg = typeConfig(n.type);
+  const go = (href: string) => {
     setOpen(false);
-    navigate(cfg.href);
+    navigate(href);
   };
 
   return (
     <div ref={dropdownRef} className="relative">
-      {/* Bell button */}
+      {/* ── Bell button ───────────────────────────────────────────────── */}
       <button
         onClick={() => setOpen(v => !v)}
-        title="Уведомления"
-        className="relative p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+        title={totalBadge > 0 ? `${totalBadge} требует внимания` : 'Уведомления'}
+        className={`relative p-1.5 rounded-lg transition-colors ${
+          totalBadge > 0
+            ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+            : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'
+        }`}
       >
         <Bell className="w-4 h-4" />
-        {unreadCount > 0 && (
+        {totalBadge > 0 && (
           <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-0.5 leading-none">
-            {unreadCount > 9 ? '9+' : unreadCount}
+            {totalBadge > 99 ? '99+' : totalBadge}
           </span>
         )}
       </button>
 
-      {/* Dropdown */}
+      {/* ── Dropdown ──────────────────────────────────────────────────── */}
       {open && (
         <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
+
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50">
             <div className="flex items-center gap-2">
               <Bell className="w-4 h-4 text-gray-500" />
               <span className="text-sm font-semibold text-gray-800">Уведомления</span>
-              {unreadCount > 0 && (
-                <span className="text-xs bg-red-100 text-red-600 font-semibold px-1.5 py-0.5 rounded-full">
-                  {unreadCount} новых
-                </span>
-              )}
             </div>
-            <div className="flex items-center gap-1">
-              {unreadCount > 0 && (
-                <button
-                  onClick={markAllRead}
-                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
-                  title="Отметить все как прочитанные"
-                >
-                  <CheckCheck className="w-3.5 h-3.5" />
-                  <span>Прочитать все</span>
-                </button>
-              )}
-              <button
-                onClick={() => setOpen(false)}
-                className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <button
+              onClick={() => setOpen(false)}
+              className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          {/* List */}
-          <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-50">
-            {notifications.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 text-gray-400">
-                <Bell className="w-8 h-8 mb-2 opacity-30" />
-                <p className="text-sm">Нет уведомлений</p>
-              </div>
-            ) : (
-              notifications.map(n => {
-                const cfg = typeConfig(n.type);
-                const Icon = cfg.icon;
-                const isUnread = new Date(n.createdAt).getTime() > lastSeen;
-
-                return (
+          {/* ── Section 1: Actionable counts ─────────────────────────── */}
+          {actionItems.length > 0 && (
+            <div className="border-b border-gray-100">
+              <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                Требуют внимания
+              </p>
+              <div className="pb-2">
+                {actionItems.map(({ label, count, href, Icon, colorText, colorBg, badgeBg }) => (
                   <button
-                    key={n.id}
-                    onClick={() => handleNotificationClick(n)}
-                    className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
-                      isUnread ? 'bg-blue-50/40' : ''
-                    }`}
+                    key={href}
+                    onClick={() => go(href)}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-left"
                   >
-                    {/* Icon */}
-                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${cfg.bg}`}>
-                      <Icon className={`w-4 h-4 ${cfg.color}`} />
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${colorBg}`}>
+                      <Icon className={`w-4 h-4 ${colorText}`} />
                     </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className={`text-xs font-semibold leading-snug ${isUnread ? 'text-gray-900' : 'text-gray-700'}`}>
-                          {n.subject}
-                        </p>
-                        {isUnread && (
-                          <span className="flex-shrink-0 w-2 h-2 rounded-full bg-blue-500 mt-1" />
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed line-clamp-2">
-                        {n.content.replace(/\n/g, ' · ')}
-                      </p>
-                      <p className="text-[10px] text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
+                    <span className="flex-1 text-sm text-gray-700 font-medium">{label}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${badgeBg}`}>
+                        {count}
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                     </div>
                   </button>
-                );
-              })
-            )}
+                ))}
+              </div>
+            </div>
+          )}
+
+          {actionItems.length === 0 && (
+            <div className="px-4 py-3 border-b border-gray-100">
+              <p className="text-xs text-gray-400 text-center py-1">
+                Нет новых событий, требующих внимания
+              </p>
+            </div>
+          )}
+
+          {/* ── Section 2: Recent notification log ───────────────────── */}
+          <div>
+            <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+              Последние события
+            </p>
+            <div className="max-h-[260px] overflow-y-auto divide-y divide-gray-50">
+              {notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-6 text-gray-400">
+                  <Bell className="w-7 h-7 mb-1.5 opacity-30" />
+                  <p className="text-xs">Нет событий</p>
+                </div>
+              ) : (
+                notifications.map(n => {
+                  const cfg = typeConfig(n.type);
+                  const Icon = cfg.icon;
+
+                  return (
+                    <button
+                      key={n.id}
+                      onClick={() => go(typeHref(n.type))}
+                      className="w-full flex items-start gap-3 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center mt-0.5 ${cfg.bg}`}>
+                        <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-gray-800 leading-snug truncate">
+                          {n.subject}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed line-clamp-1">
+                          {n.content.replace(/\n/g, ' · ')}
+                        </p>
+                      </div>
+                      <span className="flex-shrink-0 text-[10px] text-gray-400 mt-0.5 whitespace-nowrap">
+                        {timeAgo(n.createdAt)}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
 
           {/* Footer */}
           {notifications.length > 0 && (
-            <div className="border-t border-gray-100 px-4 py-2.5 text-center">
-              <p className="text-xs text-gray-400">Показаны последние {notifications.length} событий</p>
+            <div className="border-t border-gray-100 px-4 py-2 text-center bg-gray-50">
+              <p className="text-[10px] text-gray-400">
+                {notifications.length} последних событий
+              </p>
             </div>
           )}
         </div>

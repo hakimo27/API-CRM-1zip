@@ -164,6 +164,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         });
         setNewChatAlert(true);
         qc.invalidateQueries({ queryKey: ['chat-sessions'] });
+        qc.invalidateQueries({ queryKey: ['chat-unread'] });
         qc.invalidateQueries({ queryKey: ['notifications-recent'] });
       }
 

@@ -84,6 +84,7 @@ export default function ChatPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['chat-sessions'] });
       qc.invalidateQueries({ queryKey: ['crm-counts'] });
+      qc.invalidateQueries({ queryKey: ['chat-unread'] });
     },
   });
 
