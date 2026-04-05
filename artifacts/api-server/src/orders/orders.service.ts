@@ -20,6 +20,7 @@ import {
 import { AvailabilityService } from "../availability/availability.service.js";
 import { PricingService } from "../pricing/pricing.service.js";
 import { BusinessNotificationsService } from "../notifications/business-notifications.service.js";
+import { NotificationsService } from "../notifications/notifications.service.js";
 import { generateOrderNumber } from "@workspace/shared";
 
 type DrizzleDb = typeof import("@workspace/db").db;
@@ -63,6 +64,7 @@ export class OrdersService {
     private availabilityService: AvailabilityService,
     private pricingService: PricingService,
     @Optional() private businessNotifications: BusinessNotificationsService,
+    @Optional() private notificationsService: NotificationsService,
   ) {}
 
   async findAll(params: {
@@ -378,6 +380,29 @@ export class OrdersService {
       customerPhone: created.customerPhone ?? undefined,
       totalAmount: created.totalAmount ?? undefined,
     }).catch((e) => this.logger.warn("Notification failed:", e));
+
+    // Send email notifications (non-blocking, fire-and-forget)
+    if (this.notificationsService) {
+      if (dto.customerEmail) {
+        this.notificationsService
+          .sendOrderConfirmation(dto.customerEmail, dto.customerName, created.orderNumber!)
+          .catch((e) => this.logger.warn("Customer email failed:", e));
+      }
+      const managerEmail = process.env.MANAGER_EMAIL;
+      if (managerEmail) {
+        this.notificationsService
+          .sendNewOrderNotificationToManager(
+            managerEmail,
+            created.orderNumber!,
+            dto.customerName,
+            dto.customerPhone || "",
+            String(finalTotalAmount),
+            "rental"
+          )
+          .catch((e) => this.logger.warn("Manager email failed:", e));
+      }
+    }
+
     return created;
   }
 

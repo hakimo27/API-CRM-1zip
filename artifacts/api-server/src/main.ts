@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
-import { ValidationPipe } from "@nestjs/common";
+import { ValidationPipe, RequestMethod } from "@nestjs/common";
 import { AppModule } from "./app.module.js";
 import cookieParser from "cookie-parser";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter.js";
@@ -23,7 +23,16 @@ async function bootstrap() {
   app.use("/api/uploads", express.static(uploadsDir));
   app.use("/uploads", express.static(uploadsDir));
 
-  app.setGlobalPrefix("api");
+  // Exclude SEO routes from /api prefix — they must be served at root paths
+  // so nginx can proxy /robots.txt, /sitemap.xml, /feed.xml directly to this API
+  app.setGlobalPrefix("api", {
+    exclude: [
+      { path: "robots.txt", method: RequestMethod.GET },
+      { path: "sitemap.xml", method: RequestMethod.GET },
+      { path: "feed.xml", method: RequestMethod.GET },
+      { path: "feed/yml", method: RequestMethod.GET },
+    ],
+  });
 
   app.use(cookieParser());
 

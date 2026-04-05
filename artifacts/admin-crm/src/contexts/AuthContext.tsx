@@ -25,9 +25,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       api.get<User>('/auth/me')
         .then(u => {
           if (ALLOWED_ROLES.includes(u.role)) setUser(u);
-          else { localStorage.removeItem('crm_token'); }
+          else {
+            localStorage.removeItem('crm_token');
+            localStorage.removeItem('crm_refresh_token');
+          }
         })
-        .catch(() => localStorage.removeItem('crm_token'))
+        .catch(() => {
+          localStorage.removeItem('crm_token');
+          localStorage.removeItem('crm_refresh_token');
+        })
         .finally(() => setLoading(false));
     } else setLoading(false);
 
@@ -44,12 +50,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Недостаточно прав для доступа к CRM');
     }
     localStorage.setItem('crm_token', data.accessToken);
+    if (data.refreshToken) localStorage.setItem('crm_refresh_token', data.refreshToken);
     setUser(data.user);
   };
 
   const logout = () => {
+    const refreshToken = localStorage.getItem('crm_refresh_token');
     localStorage.removeItem('crm_token');
+    localStorage.removeItem('crm_refresh_token');
     setUser(null);
+    if (refreshToken) {
+      api.post('/auth/logout', { refreshToken }).catch(() => {});
+    }
   };
 
   return <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>;

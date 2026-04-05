@@ -1,9 +1,10 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import nodemailer from "nodemailer";
 
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
   private transporter: ReturnType<typeof nodemailer.createTransport> | null = null;
 
   constructor(private configService: ConfigService) {
@@ -11,28 +12,50 @@ export class NotificationsService {
     const user = this.configService.get("SMTP_USER");
 
     if (host && user) {
+      const port = parseInt(this.configService.get("SMTP_PORT") || "587");
+      const secure = this.configService.get("SMTP_SECURE") === "true" || port === 465;
+
       this.transporter = nodemailer.createTransport({
         host,
-        port: parseInt(this.configService.get("SMTP_PORT") || "587"),
-        secure: this.configService.get("SMTP_SECURE") === "true",
+        port,
+        secure,
         auth: {
           user,
           pass: this.configService.get("SMTP_PASS"),
         },
+        tls: {
+          rejectUnauthorized: false,
+        },
+      });
+
+      this.transporter.verify((err) => {
+        if (err) {
+          this.logger.warn(`SMTP connection failed: ${err.message} — emails will be logged only`);
+          this.transporter = null;
+        } else {
+          this.logger.log(`SMTP connected: ${host}:${port} (secure=${secure}) as ${user}`);
+        }
       });
     } else {
-      console.warn("SMTP not configured - emails will be logged only");
+      this.logger.warn("SMTP_HOST or SMTP_USER not configured — emails will be logged only");
     }
   }
 
-  private getFromEmail() {
+  private getFrom(): string {
     const name = this.configService.get("EMAIL_FROM_NAME") || "КаякРент";
-    const email = this.configService.get("EMAIL_FROM") || "noreply@kayakrent.ru";
+    const email =
+      this.configService.get("SMTP_FROM") ||
+      this.configService.get("EMAIL_FROM") ||
+      "noreply@kayakrent.ru";
     return `"${name}" <${email}>`;
   }
 
-  private getSiteUrl() {
-    return this.configService.get("SITE_URL") || "https://kayakrent.ru";
+  private getSiteUrl(): string {
+    return (
+      this.configService.get("APP_URL") ||
+      this.configService.get("SITE_URL") ||
+      "https://kayakrent.ru"
+    );
   }
 
   async sendEmailVerification(email: string, name: string, token: string) {
@@ -65,12 +88,14 @@ export class NotificationsService {
   }
 
   async sendOrderConfirmation(email: string, name: string, orderNumber: string) {
-    const subject = `Заказ ${orderNumber} подтверждён — КаякРент`;
+    const url = `${this.getSiteUrl()}/orders/${orderNumber}`;
+    const subject = `Заказ ${orderNumber} принят — КаякРент`;
     const html = `
-      <h2>Заказ подтверждён!</h2>
+      <h2>Заказ принят!</h2>
       <p>Здравствуйте, ${name}!</p>
-      <p>Ваш заказ <strong>${orderNumber}</strong> принят и подтверждён.</p>
-      <p>Мы свяжемся с вами для уточнения деталей.</p>
+      <p>Ваш заказ <strong>${orderNumber}</strong> успешно принят.</p>
+      <p>Мы свяжемся с вами в ближайшее время для уточнения деталей.</p>
+      <p><a href="${url}" style="color:#2563eb">Посмотреть заказ</a></p>
     `;
     await this.sendEmail(email, subject, html);
   }
@@ -92,21 +117,74 @@ export class NotificationsService {
     await this.sendEmail(email, subject, html);
   }
 
+  async sendNewOrderNotificationToManager(
+    managerEmail: string,
+    orderNumber: string,
+    customerName: string,
+    customerPhone: string,
+    totalAmount: string,
+    orderType: "rental" | "sale" = "rental"
+  ) {
+    const typeLabel = orderType === "sale" ? "продажа" : "аренда";
+    const adminUrl = `${this.getSiteUrl()}/crm/orders/${orderNumber}`;
+    const subject = `Новый заказ ${orderNumber} (${typeLabel}) — КаякРент`;
+    const html = `
+      <h2>Новый заказ!</h2>
+      <table style="border-collapse:collapse;width:100%">
+        <tr><td style="padding:6px;font-weight:bold">Номер заказа</td><td style="padding:6px">${orderNumber}</td></tr>
+        <tr><td style="padding:6px;font-weight:bold">Тип</td><td style="padding:6px">${typeLabel}</td></tr>
+        <tr><td style="padding:6px;font-weight:bold">Клиент</td><td style="padding:6px">${customerName}</td></tr>
+        <tr><td style="padding:6px;font-weight:bold">Телефон</td><td style="padding:6px">${customerPhone}</td></tr>
+        <tr><td style="padding:6px;font-weight:bold">Сумма</td><td style="padding:6px">${totalAmount} ₽</td></tr>
+      </table>
+      <p style="margin-top:16px">
+        <a href="${adminUrl}" style="padding:10px 20px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;display:inline-block">
+          Открыть в CRM
+        </a>
+      </p>
+    `;
+    await this.sendEmail(managerEmail, subject, html);
+  }
+
+  async sendTestEmail(toEmail: string): Promise<{ success: boolean; message: string }> {
+    if (!this.transporter) {
+      return { success: false, message: "SMTP не настроен. Проверьте SMTP_HOST, SMTP_USER, SMTP_PASS в .env" };
+    }
+    try {
+      await this.transporter.sendMail({
+        from: this.getFrom(),
+        to: toEmail,
+        subject: "Тестовое письмо — КаякРент",
+        html: `
+          <h2>Тест SMTP</h2>
+          <p>Это тестовое письмо от КаякРент.</p>
+          <p>Если вы получили его, настройки SMTP работают корректно.</p>
+          <p>Время отправки: ${new Date().toLocaleString("ru-RU")}</p>
+        `,
+      });
+      return { success: true, message: `Письмо отправлено на ${toEmail}` };
+    } catch (error: any) {
+      this.logger.error(`Test email failed: ${error.message}`, error.stack);
+      return { success: false, message: `Ошибка отправки: ${error.message}` };
+    }
+  }
+
   private async sendEmail(to: string, subject: string, html: string) {
     if (!this.transporter) {
-      console.log(`[EMAIL] To: ${to} | Subject: ${subject}`);
+      this.logger.log(`[EMAIL SKIPPED] To: ${to} | Subject: ${subject}`);
       return;
     }
 
     try {
       await this.transporter.sendMail({
-        from: this.getFromEmail(),
+        from: this.getFrom(),
         to,
         subject,
         html,
       });
-    } catch (error) {
-      console.error(`Failed to send email to ${to}:`, error);
+      this.logger.log(`Email sent to ${to}: ${subject}`);
+    } catch (error: any) {
+      this.logger.error(`Failed to send email to ${to}: ${error.message}`, error.stack);
     }
   }
 }

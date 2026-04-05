@@ -1,6 +1,8 @@
-import { Controller, Get, Query, UseGuards, Inject } from "@nestjs/common";
+import { Controller, Get, Post, Body, Query, UseGuards, Inject } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard.js";
+import { Roles } from "../common/decorators/roles.decorator.js";
 import { DB_TOKEN } from "../database/database.module.js";
+import { NotificationsService } from "./notifications.service.js";
 import { notificationLogsTable, ordersTable, saleOrdersTable, tourBookingsTable, chatSessionsTable } from "@workspace/db";
 import { desc, eq, and, gt } from "drizzle-orm";
 
@@ -9,7 +11,10 @@ type DrizzleDb = typeof import("@workspace/db").db;
 @Controller("notifications")
 @UseGuards(JwtAuthGuard)
 export class NotificationsController {
-  constructor(@Inject(DB_TOKEN) private db: DrizzleDb) {}
+  constructor(
+    @Inject(DB_TOKEN) private db: DrizzleDb,
+    private notificationsService: NotificationsService,
+  ) {}
 
   @Get("logs")
   async getLogs(
@@ -47,5 +52,14 @@ export class NotificationsController {
       pendingBookings: tourBookings.length,
       unreadChats: chatSessions.length,
     };
+  }
+
+  @Post("test-email")
+  @Roles("superadmin", "admin")
+  async testEmail(@Body() body: { email: string }) {
+    if (!body.email) {
+      return { success: false, message: "Укажите email для тестовой отправки" };
+    }
+    return this.notificationsService.sendTestEmail(body.email);
   }
 }
