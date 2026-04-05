@@ -168,6 +168,48 @@ bash deploy/enable-ssl.sh your-domain.ru
 ```
 Automates: certbot certonly → copy certs to docker/ssl/ → patch nginx-ssl.conf → switch volume → reload nginx → cron renewal
 
+## PWA & Push Notifications
+
+### Service Workers
+- `artifacts/admin-crm/public/sw.js` — registered at `/crm/sw.js` with scope `/crm/`
+- `artifacts/kayak-rental/public/sw.js` — registered at `/sw.js` with scope `/`
+- Both handle push events and show browser notifications even when app is not focused
+
+### VAPID Keys (Web Push)
+- Stored as env vars: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
+- Service: `artifacts/api-server/src/notifications/push-notifications.service.ts`
+- DB table: `pushSubscriptionsTable` in `lib/db/src/schema/pushSubscriptions.ts`
+- Push endpoints: `GET /api/notifications/push/vapid-key`, `POST /api/notifications/push/subscribe`, `POST /api/notifications/push/unsubscribe`
+- Triggered automatically by `BusinessNotificationsService` on all new events
+
+### CRM Bell & Install Buttons (AdminLayout)
+- `usePushSubscription` hook: fetches VAPID key, subscribes to push, stores in DB
+- `usePwaInstall` hook: listens for `beforeinstallprompt`, exposes install()
+- Bell (🔔) icon in header: idle → subscribe; green → already subscribed
+- Download icon: visible only when browser supports PWA install
+
+## Mobile Chat UX
+
+### ChatWidget (public site — kayak-rental)
+- Full-screen on mobile (`fixed inset-0`) with backdrop overlay; popup on desktop (`sm:w-96`)
+- `<textarea>` with auto-resize (via `useAutoResizeTextarea` hook): min-height 46px, max 120px
+- `Enter` sends on desktop; `Shift+Enter` or tap Send button on mobile
+- iOS safe-area padding: `env(safe-area-inset-bottom)` / `env(safe-area-inset-top)`
+- `visualViewport` resize listener to scroll messages when keyboard opens
+- Arrow-left back button on mobile header instead of chevron-down
+- Send button is 44×44px (touch-friendly)
+- Quick reply buttons have proper `py-1.5` touch targets
+
+### CRM ChatPage (admin-crm)
+- Mobile-first toggle layout: shows list OR chat (not side-by-side on mobile)
+- `selectedSession=null` → full-width session list; `selectedSession` → full-width chat
+- ArrowLeft back button in chat header on mobile (`sm:hidden`)
+- `<textarea>` with auto-resize: min-height 46px, max 140px
+- `Enter` sends on desktop only; tap Send button on mobile
+- Height: `h-[calc(100dvh-5.5rem)] sm:h-[calc(100vh-8rem)]` (accounts for header + padding)
+- `overscroll-contain` + `-webkit-overflow-scrolling: touch` on messages area
+- `visualViewport` resize listener for keyboard handling
+
 ## Important Implementation Notes
 
 - **DB injection**: `@Inject(DB_TOKEN)` where `DB_TOKEN = "DRIZZLE_DB"`

@@ -233,7 +233,7 @@ cat uploads_backup.tar.gz | docker run --rm -i \
 
 ---
 
-## 8. Telegram и Email
+## 8. Telegram, Email и Push-уведомления
 
 ### Telegram
 
@@ -250,14 +250,53 @@ curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
 ### Email (SMTP)
 
 ```env
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
+SMTP_HOST=smtp.gmail.com    # или smtp.mail.ru, smtp.yandex.ru
+SMTP_PORT=587               # 465 для SSL, 587 для STARTTLS
+SMTP_SECURE=false           # true для порта 465
 SMTP_USER=your@gmail.com
-SMTP_PASS=app_password
+SMTP_PASS=app_password      # пароль приложения, не пароль аккаунта
 SMTP_FROM=noreply@your-domain.ru
+EMAIL_FROM_NAME=Байдабаза
+MANAGER_EMAIL=manager@your-domain.ru  # кому приходят уведомления
 ```
 
+Для Mail.ru создать пароль приложения: `mail.ru → Настройки → Пароли для внешних приложений`.
+
 Управление настройками: CRM → Настройки → Уведомления.
+
+### PWA и Web Push (браузерные уведомления)
+
+Admin CRM доступен как PWA (Progressive Web App) и поддерживает push-уведомления для менеджеров.
+
+**Генерация VAPID-ключей** (один раз, перед деплоем):
+
+```bash
+node -e "const wp=require('web-push'); \
+const k=wp.generateVAPIDKeys(); \
+console.log('VAPID_PUBLIC_KEY='+k.publicKey); \
+console.log('VAPID_PRIVATE_KEY='+k.privateKey)"
+```
+
+Добавить в `.env`:
+
+```env
+VAPID_PUBLIC_KEY=<публичный ключ>
+VAPID_PRIVATE_KEY=<приватный ключ>
+VAPID_SUBJECT=mailto:admin@your-domain.ru
+```
+
+После деплоя менеджеры могут включить push в CRM → кнопка 🔔 в шапке. Push-уведомления приходят при: новых заказах, бронях туров, сообщениях в чате, новых заявках.
+
+**Важно:** не меняйте VAPID-ключи после первой генерации — все браузерные подписки перестанут работать.
+
+### SEO-эндпоинты
+
+| URL | Описание |
+|-----|----------|
+| `/robots.txt` | Инструкции для поисковиков |
+| `/sitemap.xml` | Карта сайта (Яндекс, Google) |
+| `/feed.xml` | RSS-лента статей |
+| `/feed/yml` | YML-выгрузка товаров (Яндекс.Маркет) |
 
 ---
 
@@ -424,6 +463,9 @@ docker compose down && docker compose up -d
 - [ ] Пароль суперадмина изменён в CRM → Профиль
 - [ ] Контакты компании заполнены в CRM → Настройки → Общие
 - [ ] Telegram webhook настроен
-- [ ] SMTP настроен и протестирован
+- [ ] SMTP настроен и протестирован (POST /api/notifications/test-email)
+- [ ] VAPID-ключи сгенерированы и добавлены в `.env`
+- [ ] Push-уведомления проверены: CRM → 🔔 → разрешить в браузере
+- [ ] SEO-эндпоинты доступны: `/robots.txt`, `/sitemap.xml`
 - [ ] Настроен cron для резервных копий БД
 - [ ] Настроен cron для обновления SSL-сертификатов

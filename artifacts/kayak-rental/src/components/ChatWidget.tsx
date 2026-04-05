@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { MessageSquare, X, Send, ChevronDown, Loader2, Clock, CheckCircle2 } from "lucide-react";
+import { MessageSquare, X, Send, ChevronDown, Loader2, Clock, CheckCircle2, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PhoneInput } from "./PhoneInput";
 
@@ -131,6 +131,17 @@ function isWithinWorkingHours(
 
 const QUICK_REPLIES = ["Аренда байдарки", "Цены и тарифы", "Доставка", "Туры"];
 
+function useAutoResizeTextarea(value: string) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+  }, [value]);
+  return ref;
+}
+
 export default function ChatWidget({
   enabled = true,
   greeting = "Здравствуйте! Чем можем помочь?",
@@ -183,7 +194,9 @@ export default function ChatWidget({
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const textareaRef = useAutoResizeTextarea(inputText);
 
   const initialized = useRef(false);
   useEffect(() => {
@@ -224,6 +237,17 @@ export default function ChatWidget({
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [open, sessionId, phase, fetchMessages]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleResize = () => {
+      if (messagesContainerRef.current) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+      }
+    };
+    window.visualViewport?.addEventListener("resize", handleResize);
+    return () => window.visualViewport?.removeEventListener("resize", handleResize);
+  }, [open]);
 
   async function openChat() {
     setOpen(true);
@@ -350,6 +374,16 @@ export default function ChatWidget({
     }
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      const isMobile = window.innerWidth < 640;
+      if (!isMobile) {
+        e.preventDefault();
+        send(inputText);
+      }
+    }
+  }
+
   if (!enabled) return null;
 
   const inputCls = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -363,185 +397,245 @@ export default function ChatWidget({
       {!open && (
         <button
           onClick={openChat}
-          className="fixed bottom-6 right-6 z-50 bg-blue-600 hover:bg-blue-700 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg transition-all hover:scale-105"
+          className="fixed bottom-6 right-6 z-50 bg-blue-600 hover:bg-blue-700 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg transition-all hover:scale-105 active:scale-95"
           aria-label="Открыть чат"
+          style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
         >
           <MessageSquare className="w-6 h-6" />
         </button>
       )}
 
       {open && (
-        <div className="fixed bottom-6 right-6 z-50 w-80 sm:w-96 flex flex-col rounded-2xl shadow-2xl overflow-hidden bg-white border border-gray-200">
-          {/* Header */}
-          <div className={cn("text-white px-4 py-3 flex items-center justify-between", isOnline ? "bg-blue-600" : "bg-gray-600")}>
-            <div>
-              <div className="font-semibold text-sm">Чат с менеджером</div>
-              <div className={cn("text-xs", isOnline ? "text-blue-200" : "text-gray-300")}>
-                {headerSubtitle}
-              </div>
-            </div>
-            <button onClick={() => setOpen(false)} className={cn("p-1 rounded transition-colors", isOnline ? "hover:bg-blue-700" : "hover:bg-gray-700")}>
-              <ChevronDown className="w-5 h-5" />
-            </button>
-          </div>
+        <>
+          {/* Mobile backdrop */}
+          <div
+            className="fixed inset-0 z-40 bg-black/20 sm:hidden"
+            onClick={() => setOpen(false)}
+          />
 
-          {/* Offline: show form */}
-          {phase === "offline" && offlineFormEnabled && (
-            <form onSubmit={submitOfflineForm} className="p-4 space-y-3">
-              <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-xl border border-amber-100">
-                <Clock className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-800">{offlineMessageText}</p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Ваше имя{requireName ? " *" : ""}
-                </label>
-                <input value={offlineName} onChange={e => setOfflineName(e.target.value)}
-                  placeholder="Иван" className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Телефон{requirePhone ? " *" : ""}
-                </label>
-                <PhoneInput value={offlinePhone} onChange={setOfflinePhone} className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Email{requireEmail ? " *" : ""}
-                </label>
-                <input type="email" value={offlineEmail} onChange={e => setOfflineEmail(e.target.value)}
-                  placeholder="email@example.ru" className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Сообщение *</label>
-                <textarea value={offlineMsg} onChange={e => setOfflineMsg(e.target.value)}
-                  placeholder="Опишите ваш вопрос..." rows={3}
-                  className={inputCls + " resize-none"} />
-              </div>
-              {offlineError && <p className="text-xs text-red-600">{offlineError}</p>}
-              <button type="submit" disabled={offlineSubmitting}
-                className="w-full py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                {offlineSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                Отправить заявку
+          {/* Chat window — full screen on mobile, popup on desktop */}
+          <div
+            className={cn(
+              "fixed z-50 flex flex-col bg-white",
+              "inset-0 sm:inset-auto",
+              "sm:bottom-6 sm:right-6 sm:w-96 sm:max-h-[600px]",
+              "sm:rounded-2xl sm:shadow-2xl sm:border sm:border-gray-200",
+              "overflow-hidden"
+            )}
+            style={{
+              paddingBottom: "env(safe-area-inset-bottom)",
+            }}
+          >
+            {/* Header */}
+            <div className={cn(
+              "text-white px-4 py-3.5 flex items-center gap-3 flex-shrink-0",
+              isOnline ? "bg-blue-600" : "bg-gray-600"
+            )}
+              style={{ paddingTop: "calc(0.875rem + env(safe-area-inset-top))" }}
+            >
+              <button
+                onClick={() => setOpen(false)}
+                className={cn("sm:hidden p-1.5 rounded-full transition-colors", isOnline ? "hover:bg-blue-700" : "hover:bg-gray-700")}
+                aria-label="Закрыть"
+              >
+                <ArrowLeft className="w-5 h-5" />
               </button>
-            </form>
-          )}
-
-          {/* Offline: no form, just message */}
-          {phase === "offline" && !offlineFormEnabled && (
-            <div className="p-5 space-y-3">
-              <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-xl border border-amber-100">
-                <Clock className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-amber-800">{offlineMessageText}</p>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-sm">Чат с менеджером</div>
+                <div className={cn("text-xs", isOnline ? "text-blue-200" : "text-gray-300")}>
+                  {headerSubtitle}
+                </div>
               </div>
-              <p className="text-xs text-center text-gray-400">Попробуйте написать нам позже</p>
+              <button
+                onClick={() => setOpen(false)}
+                className={cn("hidden sm:flex p-1 rounded transition-colors", isOnline ? "hover:bg-blue-700" : "hover:bg-gray-700")}
+                aria-label="Свернуть"
+              >
+                <ChevronDown className="w-5 h-5" />
+              </button>
             </div>
-          )}
 
-          {/* Offline form success */}
-          {phase === "offline-success" && (
-            <div className="p-6 flex flex-col items-center gap-3 text-center">
-              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="w-7 h-7 text-green-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900">Заявка отправлена</h3>
-              <p className="text-sm text-gray-500">Мы получили ваше обращение и свяжемся с вами в рабочее время.</p>
-            </div>
-          )}
-
-          {/* Pre-chat form */}
-          {phase === "pre-chat" && (
-            <form onSubmit={submitPreChat} className="p-4 space-y-3">
-              {greeting && (
-                <p className="text-sm text-gray-600 mb-1">{greeting}</p>
-              )}
-              {collectName && (
+            {/* Offline: show form */}
+            {phase === "offline" && offlineFormEnabled && (
+              <form onSubmit={submitOfflineForm} className="flex-1 overflow-y-auto p-4 space-y-3">
+                <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                  <Clock className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-800">{offlineMessageText}</p>
+                </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Ваше имя</label>
-                  <input value={leadName} onChange={e => setLeadName(e.target.value)}
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Ваше имя{requireName ? " *" : ""}
+                  </label>
+                  <input value={offlineName} onChange={e => setOfflineName(e.target.value)}
                     placeholder="Иван" className={inputCls} />
                 </div>
-              )}
-              {collectPhone && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Телефон</label>
-                  <PhoneInput value={leadPhone} onChange={setLeadPhone} className={inputCls} />
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Телефон{requirePhone ? " *" : ""}
+                  </label>
+                  <PhoneInput value={offlinePhone} onChange={setOfflinePhone} className={inputCls} />
                 </div>
-              )}
-              {collectEmail && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
-                  <input type="email" value={leadEmail} onChange={e => setLeadEmail(e.target.value)}
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Email{requireEmail ? " *" : ""}
+                  </label>
+                  <input type="email" value={offlineEmail} onChange={e => setOfflineEmail(e.target.value)}
                     placeholder="email@example.ru" className={inputCls} />
                 </div>
-              )}
-              {leadError && <p className="text-xs text-red-600">{leadError}</p>}
-              <button type="submit" disabled={loading}
-                className="w-full py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                Начать диалог
-              </button>
-            </form>
-          )}
-
-          {/* Chat messages */}
-          {phase === "chat" && (
-            <>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-48 max-h-80 bg-gray-50">
-                {loading && (
-                  <div className="flex items-center justify-center py-6">
-                    <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                  </div>
-                )}
-
-                {!loading && messages.length === 0 && (
-                  <div className="text-center text-gray-400 text-sm py-4">
-                    {greeting || "Начните диалог с менеджером"}
-                  </div>
-                )}
-
-                {messages.map((msg) => (
-                  <div key={msg.id} className={cn("flex", msg.sender === "customer" ? "justify-end" : "justify-start")}>
-                    <div className={cn(
-                      "max-w-[80%] rounded-2xl px-3 py-2 text-sm",
-                      msg.sender === "customer"
-                        ? "bg-blue-600 text-white rounded-br-sm"
-                        : "bg-white text-gray-800 border border-gray-200 rounded-bl-sm",
-                    )}>
-                      {msg.content}
-                    </div>
-                  </div>
-                ))}
-                <div ref={messagesEndRef} />
-              </div>
-
-              <div className="px-3 py-2 border-t border-gray-100 flex flex-wrap gap-1.5">
-                {QUICK_REPLIES.map((r) => (
-                  <button key={r} onClick={() => send(r)} disabled={sending || loading}
-                    className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2.5 py-1 hover:bg-blue-100 transition-colors disabled:opacity-50">
-                    {r}
-                  </button>
-                ))}
-              </div>
-
-              {sendError && <p className="px-3 text-xs text-red-600">{sendError}</p>}
-
-              <div className="p-3 flex gap-2 border-t border-gray-100 bg-white">
-                <input type="text" value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send(inputText)}
-                  placeholder={placeholder} disabled={loading}
-                  className="flex-1 text-sm border border-gray-200 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-                />
-                <button onClick={() => send(inputText)}
-                  disabled={!inputText.trim() || sending || loading}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-full w-9 h-9 flex items-center justify-center shrink-0 transition-colors">
-                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Сообщение *</label>
+                  <textarea value={offlineMsg} onChange={e => setOfflineMsg(e.target.value)}
+                    placeholder="Опишите ваш вопрос..." rows={4}
+                    className={inputCls + " resize-none"} />
+                </div>
+                {offlineError && <p className="text-xs text-red-600">{offlineError}</p>}
+                <button type="submit" disabled={offlineSubmitting}
+                  className="w-full py-3 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                  {offlineSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Отправить заявку
                 </button>
+              </form>
+            )}
+
+            {/* Offline: no form, just message */}
+            {phase === "offline" && !offlineFormEnabled && (
+              <div className="flex-1 p-5 space-y-3">
+                <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                  <Clock className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-800">{offlineMessageText}</p>
+                </div>
+                <p className="text-xs text-center text-gray-400">Попробуйте написать нам позже</p>
               </div>
-            </>
-          )}
-        </div>
+            )}
+
+            {/* Offline form success */}
+            {phase === "offline-success" && (
+              <div className="flex-1 p-6 flex flex-col items-center justify-center gap-3 text-center">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle2 className="w-8 h-8 text-green-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900">Заявка отправлена</h3>
+                <p className="text-sm text-gray-500">Мы получили ваше обращение и свяжемся с вами в рабочее время.</p>
+              </div>
+            )}
+
+            {/* Pre-chat form */}
+            {phase === "pre-chat" && (
+              <form onSubmit={submitPreChat} className="flex-1 overflow-y-auto p-4 space-y-3">
+                {greeting && (
+                  <p className="text-sm text-gray-600 mb-1">{greeting}</p>
+                )}
+                {collectName && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Ваше имя</label>
+                    <input value={leadName} onChange={e => setLeadName(e.target.value)}
+                      placeholder="Иван" className={inputCls} />
+                  </div>
+                )}
+                {collectPhone && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Телефон</label>
+                    <PhoneInput value={leadPhone} onChange={setLeadPhone} className={inputCls} />
+                  </div>
+                )}
+                {collectEmail && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                    <input type="email" value={leadEmail} onChange={e => setLeadEmail(e.target.value)}
+                      placeholder="email@example.ru" className={inputCls} />
+                  </div>
+                )}
+                {leadError && <p className="text-xs text-red-600">{leadError}</p>}
+                <button type="submit" disabled={loading}
+                  className="w-full py-3 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                  {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Начать диалог
+                </button>
+              </form>
+            )}
+
+            {/* Chat messages */}
+            {phase === "chat" && (
+              <>
+                <div
+                  ref={messagesContainerRef}
+                  className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 overscroll-contain"
+                  style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+                >
+                  {loading && (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                    </div>
+                  )}
+
+                  {!loading && messages.length === 0 && (
+                    <div className="text-center text-gray-400 text-sm py-4">
+                      {greeting || "Начните диалог с менеджером"}
+                    </div>
+                  )}
+
+                  {messages.map((msg) => (
+                    <div key={msg.id} className={cn("flex", msg.sender === "customer" ? "justify-end" : "justify-start")}>
+                      <div className={cn(
+                        "max-w-[82%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
+                        msg.sender === "customer"
+                          ? "bg-blue-600 text-white rounded-br-sm"
+                          : "bg-white text-gray-800 border border-gray-200 rounded-bl-sm shadow-sm",
+                      )}>
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Quick replies */}
+                <div className="px-3 py-2 border-t border-gray-100 flex flex-wrap gap-1.5 flex-shrink-0 bg-white">
+                  {QUICK_REPLIES.map((r) => (
+                    <button key={r} onClick={() => send(r)} disabled={sending || loading}
+                      className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-3 py-1.5 hover:bg-blue-100 active:bg-blue-200 transition-colors disabled:opacity-50">
+                      {r}
+                    </button>
+                  ))}
+                </div>
+
+                {sendError && <p className="px-3 text-xs text-red-600 flex-shrink-0">{sendError}</p>}
+
+                {/* Composer */}
+                <div className="px-3 pb-3 pt-2 flex items-end gap-2 border-t border-gray-100 bg-white flex-shrink-0">
+                  <textarea
+                    ref={textareaRef}
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={placeholder}
+                    disabled={loading}
+                    rows={1}
+                    className={cn(
+                      "flex-1 text-sm border border-gray-200 rounded-2xl px-4 py-3",
+                      "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                      "disabled:opacity-50 resize-none overflow-hidden leading-snug",
+                      "min-h-[46px] max-h-[120px]"
+                    )}
+                    style={{ lineHeight: "1.4" }}
+                  />
+                  <button
+                    onClick={() => send(inputText)}
+                    disabled={!inputText.trim() || sending || loading}
+                    className={cn(
+                      "bg-blue-600 hover:bg-blue-700 active:bg-blue-800",
+                      "disabled:bg-gray-300 text-white rounded-full",
+                      "w-11 h-11 flex items-center justify-center shrink-0 transition-colors"
+                    )}
+                    aria-label="Отправить"
+                  >
+                    {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </>
       )}
     </>
   );

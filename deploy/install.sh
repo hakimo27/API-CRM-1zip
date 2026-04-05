@@ -229,7 +229,18 @@ else
   warn "APP_RUN_DEMO_SEED=false — skipping demo seed (expected for production)"
 fi
 
-# ── 14. Start web, admin, nginx ───────────────────────────────────────────────
+# ── 14. VAPID keys check (Push Notifications) ────────────────────────────────
+if [ -z "${VAPID_PUBLIC_KEY:-}" ] || [ -z "${VAPID_PRIVATE_KEY:-}" ]; then
+  warn "VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY not set in .env"
+  warn "Push notifications (Web Push) will be disabled."
+  warn "To enable: generate VAPID keys and add them to .env:"
+  warn "  node -e \"const wp=require('web-push');const k=wp.generateVAPIDKeys();console.log('VAPID_PUBLIC_KEY='+k.publicKey+'\\nVAPID_PRIVATE_KEY='+k.privateKey)\""
+  warn "Then restart: docker compose restart api"
+else
+  success "VAPID keys configured — Web Push notifications enabled"
+fi
+
+# ── 15. Start web, admin, nginx ───────────────────────────────────────────────
 info "Starting web, admin CRM, and nginx..."
 docker compose up -d web admin nginx
 success "All services started"

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, Loader2, RefreshCw, X } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { MessageSquare, Send, Loader2, RefreshCw, X, ArrowLeft } from 'lucide-react';
 
 type FilterTab = 'open' | 'closed' | 'all';
 
@@ -11,12 +11,25 @@ const TAB_LABELS: Record<FilterTab, string> = {
   all: 'Все',
 };
 
+function useAutoResizeTextarea(value: string) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+  }, [value]);
+  return ref;
+}
+
 export default function ChatPage() {
   const qc = useQueryClient();
   const [selectedSession, setSelectedSession] = useState<any>(null);
   const [message, setMessage] = useState('');
   const [tab, setTab] = useState<FilterTab>('open');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useAutoResizeTextarea(message);
 
   const { data: sessions = [], isLoading, dataUpdatedAt } = useQuery<any[]>({
     queryKey: ['chat-sessions', 'all'],
@@ -57,6 +70,15 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const handleVisualViewportResize = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+  }, []);
+
+  useEffect(() => {
+    window.visualViewport?.addEventListener('resize', handleVisualViewportResize);
+    return () => window.visualViewport?.removeEventListener('resize', handleVisualViewportResize);
+  }, [handleVisualViewportResize]);
+
   const markAsRead = useMutation({
     mutationFn: (id: number) => api.patch(`/chat/sessions/${id}/read`, {}),
     onSuccess: () => {
@@ -75,6 +97,10 @@ export default function ChatPage() {
     if (session.unreadCount > 0) {
       markAsRead.mutate(session.id);
     }
+  };
+
+  const handleBack = () => {
+    setSelectedSession(null);
   };
 
   const sendMessage = useMutation({
@@ -118,6 +144,16 @@ export default function ChatPage() {
     sendMessage.mutate(message.trim());
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const isMobile = window.innerWidth < 640;
+      if (!isMobile) {
+        e.preventDefault();
+        handleSend(e as any);
+      }
+    }
+  };
+
   function getContactLine(session: any): string {
     const meta = session.metadata as Record<string, unknown> | null;
     const phone = (meta?.phone as string) || '';
@@ -127,15 +163,23 @@ export default function ChatPage() {
 
   const isClosed = selectedSession && selectedSession.status !== 'open';
 
+  const showList = !selectedSession;
+  const showChat = !!selectedSession;
+
   return (
-    <div className="flex h-[calc(100vh-8rem)] bg-white rounded-2xl border border-gray-100 overflow-hidden">
-      {/* Sessions list */}
-      <div className="w-72 border-r border-gray-100 flex flex-col flex-shrink-0">
-        <div className="px-4 py-4 border-b border-gray-100">
+    <div className="flex h-[calc(100dvh-5.5rem)] sm:h-[calc(100vh-8rem)] bg-white rounded-2xl border border-gray-100 overflow-hidden">
+
+      {/* Sessions list — hidden on mobile when chat is open */}
+      <div className={`
+        flex flex-col border-r border-gray-100 flex-shrink-0
+        w-full sm:w-72
+        ${showList ? 'flex' : 'hidden sm:flex'}
+      `}>
+        <div className="px-4 py-4 border-b border-gray-100 flex-shrink-0">
           {newSessionAlert && (
             <button
               onClick={handleDismissAlert}
-              className="w-full mb-3 flex items-center gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-700 font-medium hover:bg-orange-100 transition-colors animate-pulse"
+              className="w-full mb-3 flex items-center gap-2 px-3 py-2.5 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-700 font-medium hover:bg-orange-100 transition-colors animate-pulse"
             >
               <span className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0" />
               Новый диалог — нажмите, чтобы посмотреть
@@ -162,7 +206,7 @@ export default function ChatPage() {
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`flex-1 text-xs py-1.5 transition-colors ${
+                className={`flex-1 text-xs py-2 transition-colors ${
                   tab === t ? 'bg-blue-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-50'
                 }`}
               >
@@ -193,7 +237,7 @@ export default function ChatPage() {
                 <button
                   key={session.id}
                   onClick={() => handleSelectSession(session)}
-                  className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${
+                  className={`w-full text-left px-4 py-3.5 border-b border-gray-50 hover:bg-gray-50 active:bg-gray-100 transition-colors ${
                     isSelected ? 'bg-blue-50 border-l-2 border-l-blue-600' : ''
                   } ${hasUnread && !isSelected ? 'bg-amber-50/50' : ''}`}
                 >
@@ -226,29 +270,39 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* Chat area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Chat area — full width on mobile when session selected */}
+      <div className={`
+        flex-1 flex flex-col min-w-0
+        ${showChat ? 'flex' : 'hidden sm:flex'}
+      `}>
         {!selectedSession ? (
           <div className="flex-1 flex items-center justify-center text-gray-400">
             <div className="text-center">
               <MessageSquare className="w-16 h-16 mx-auto mb-3 opacity-20" />
-              <p>Выберите чат</p>
+              <p className="text-sm">Выберите чат из списка</p>
             </div>
           </div>
         ) : (
           <>
-            {/* Header */}
-            <div className="px-5 py-3.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-              <div>
-                <div className="font-semibold text-sm text-gray-900 flex items-center gap-2">
+            {/* Chat header with back button on mobile */}
+            <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100 bg-gray-50 flex items-center gap-3 flex-shrink-0">
+              <button
+                onClick={handleBack}
+                className="sm:hidden p-2 -ml-1 text-gray-500 hover:text-gray-700 rounded-lg active:bg-gray-200 transition-colors"
+                aria-label="Назад"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-sm text-gray-900 flex items-center gap-2 flex-wrap">
                   {selectedSession.customerName || `Диалог #${selectedSession.id}`}
                   {isClosed && (
                     <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-normal">закрыт</span>
                   )}
                 </div>
-                <div className="text-xs text-gray-400">{getContactLine(selectedSession)}</div>
+                <div className="text-xs text-gray-400 truncate">{getContactLine(selectedSession)}</div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 {isClosed ? (
                   <button
                     onClick={() => reopenSession.mutate(selectedSession.id)}
@@ -256,7 +310,7 @@ export default function ChatPage() {
                     className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 border border-blue-200 bg-blue-50 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
                   >
                     {reopenSession.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                    Переоткрыть
+                    <span className="hidden sm:inline">Переоткрыть</span>
                   </button>
                 ) : (
                   <button
@@ -265,14 +319,18 @@ export default function ChatPage() {
                     className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-red-600 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
                   >
                     {closeSession.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
-                    Закрыть диалог
+                    <span className="hidden sm:inline">Закрыть диалог</span>
                   </button>
                 )}
               </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+            <div
+              ref={messagesContainerRef}
+              className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 overscroll-contain"
+              style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+            >
               {messages.length === 0 ? (
                 <div className="text-center py-8 text-gray-400 text-sm">Нет сообщений</div>
               ) : (
@@ -281,7 +339,7 @@ export default function ChatPage() {
                   const isBot = msg.sender === 'bot';
                   return (
                     <div key={msg.id} className={`flex ${isOp ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm ${
+                      <div className={`max-w-[75%] sm:max-w-[70%] px-4 py-2.5 rounded-2xl text-sm ${
                         isOp
                           ? 'bg-blue-600 text-white rounded-br-sm'
                           : isBot
@@ -289,7 +347,7 @@ export default function ChatPage() {
                             : 'bg-white text-gray-900 border border-gray-200 rounded-bl-sm'
                       }`}>
                         {isBot && <div className="text-xs text-gray-400 mb-1">Бот</div>}
-                        <p>{msg.content}</p>
+                        <p className="leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
                         <div className={`text-xs mt-1 ${isOp ? 'text-blue-200' : 'text-gray-400'}`}>
                           {new Date(msg.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                         </div>
@@ -301,34 +359,42 @@ export default function ChatPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input area */}
+            {/* Composer */}
             {isClosed ? (
-              <div className="p-4 border-t border-gray-100 bg-white">
+              <div className="p-4 border-t border-gray-100 bg-white flex-shrink-0" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
                 <div className="flex items-center gap-3 text-sm text-gray-500 bg-gray-50 rounded-xl px-4 py-3">
                   <MessageSquare className="w-4 h-4 flex-shrink-0 text-gray-400" />
-                  <span>Диалог закрыт. Если клиент напишет снова, он автоматически переоткроется.</span>
+                  <span className="text-xs">Диалог закрыт. Если клиент напишет снова, он автоматически переоткроется.</span>
                   <button
                     onClick={() => reopenSession.mutate(selectedSession.id)}
                     disabled={reopenSession.isPending}
                     className="ml-auto text-xs text-blue-600 hover:underline flex-shrink-0 disabled:opacity-50"
                   >
-                    Переоткрыть вручную
+                    Открыть
                   </button>
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleSend} className="flex gap-2 p-4 border-t border-gray-100 bg-white">
-                <input
+              <form
+                onSubmit={handleSend}
+                className="flex items-end gap-2 px-3 pt-2 pb-3 border-t border-gray-100 bg-white flex-shrink-0"
+                style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+              >
+                <textarea
+                  ref={textareaRef}
                   value={message}
                   onChange={e => setMessage(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend(e as any)}
+                  onKeyDown={handleKeyDown}
                   placeholder="Написать сообщение..."
-                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  rows={1}
+                  className="flex-1 px-4 py-3 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none overflow-hidden leading-snug min-h-[46px] max-h-[140px]"
+                  style={{ lineHeight: '1.4' }}
                 />
                 <button
                   type="submit"
                   disabled={!message.trim() || sendMessage.isPending}
-                  className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  className="w-11 h-11 bg-blue-600 text-white rounded-full hover:bg-blue-700 active:bg-blue-800 transition-colors disabled:opacity-50 flex items-center justify-center flex-shrink-0"
+                  aria-label="Отправить"
                 >
                   {sendMessage.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>
