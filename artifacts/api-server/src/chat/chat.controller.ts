@@ -79,4 +79,10 @@ export class ChatController {
   updateStatus(@Param("id", ParseIntPipe) id: number, @Body() body: { status: string }) {
     return this.chatService.updateSessionStatus(id, body.status);
   }
+
+  @Patch("sessions/:id/read")
+  @Roles("admin", "manager")
+  markAsRead(@Param("id", ParseIntPipe) id: number) {
+    return this.chatService.markAsRead(id);
+  }
 }

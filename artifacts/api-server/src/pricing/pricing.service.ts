@@ -51,7 +51,7 @@ export class PricingService {
       : 0;
 
     if (!tariff) {
-      return { basePrice: 0, totalPrice: 0, days, tariffType, deposit };
+      return { basePrice: 0, totalPrice: 0, days, tariffType, deposit, tariffFound: false };
     }
 
     const basePrice = parseFloat(tariff.pricePerDay as string);
@@ -63,6 +63,7 @@ export class PricingService {
       days,
       tariffType,
       deposit,
+      tariffFound: true,
     };
   }
 

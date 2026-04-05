@@ -1,16 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import {
   ArrowLeft, Plus, Trash2, Search, Loader2, User, Calendar,
-  Package, MapPin, MessageSquare, CheckCircle, AlertCircle,
+  Package, MapPin, MessageSquare, CheckCircle, AlertCircle, Tag, Banknote,
 } from 'lucide-react';
 import { PhoneInput } from '@/components/PhoneInput';
 
 const inputCls = "w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm";
 const labelCls = "block text-sm font-medium text-gray-700 mb-1";
+
+const TARIFF_LABELS: Record<string, string> = {
+  weekday: 'Будни',
+  weekend: 'Выходные',
+  week: 'Неделя (7+ дней)',
+  may_holidays: 'Майские праздники',
+};
 
 function F({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
@@ -36,22 +43,106 @@ function Section({ title, icon: Icon, children }: { title: string; icon: any; ch
   );
 }
 
+type PricingStatus = 'idle' | 'loading' | 'ok' | 'no_dates' | 'no_tariff' | 'error';
+
+interface Pricing {
+  basePrice: number;
+  totalPrice: number;
+  days: number;
+  tariffType: string;
+  deposit: number;
+  tariffFound: boolean;
+}
+
 interface OrderItem {
   productId: number;
   productName: string;
-  pricePerDay: number;
   quantity: number;
   startDate: string;
   endDate: string;
-  totalPrice: number;
   available: boolean | null;
   checkingAvailability: boolean;
+  pricingStatus: PricingStatus;
+  pricing: Pricing | null;
 }
 
 function calcDays(start: string, end: string) {
   if (!start || !end) return 0;
   const ms = new Date(end).getTime() - new Date(start).getTime();
   return Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+}
+
+function itemTotal(item: OrderItem): number {
+  if (!item.pricing || !item.pricing.tariffFound) return 0;
+  return item.pricing.totalPrice * item.quantity;
+}
+
+function itemDeposit(item: OrderItem): number {
+  if (!item.pricing) return 0;
+  return item.pricing.deposit * item.quantity;
+}
+
+function PricingInfo({ item }: { item: OrderItem }) {
+  if (!item.startDate || !item.endDate) {
+    return (
+      <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2 py-1.5 rounded-lg">
+        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+        Заполните даты аренды для расчёта цены
+      </div>
+    );
+  }
+  if (item.pricingStatus === 'loading') {
+    return (
+      <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
+        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        Рассчитываем стоимость...
+      </div>
+    );
+  }
+  if (item.pricingStatus === 'no_tariff') {
+    return (
+      <div className="mt-2 flex items-center gap-1.5 text-xs text-red-600 bg-red-50 px-2 py-1.5 rounded-lg">
+        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+        Нет подходящего тарифа для выбранных дат
+      </div>
+    );
+  }
+  if (item.pricingStatus === 'error') {
+    return (
+      <div className="mt-2 flex items-center gap-1.5 text-xs text-red-600 bg-red-50 px-2 py-1.5 rounded-lg">
+        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+        Ошибка расчёта цены — проверьте даты или тарифы
+      </div>
+    );
+  }
+  if (item.pricingStatus === 'ok' && item.pricing) {
+    const p = item.pricing;
+    const total = p.totalPrice * item.quantity;
+    const dep = p.deposit * item.quantity;
+    return (
+      <div className="mt-2 bg-blue-50 rounded-lg px-3 py-2 space-y-1">
+        <div className="flex items-center justify-between text-xs">
+          <span className="flex items-center gap-1 text-blue-700">
+            <Tag className="w-3.5 h-3.5" />
+            {TARIFF_LABELS[p.tariffType] || p.tariffType}
+          </span>
+          <span className="text-gray-500">{p.basePrice.toLocaleString('ru-RU')} ₽/день × {p.days} дн. × {item.quantity} шт.</span>
+        </div>
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-gray-500 flex items-center gap-1">
+            <Banknote className="w-3.5 h-3.5" />
+            Залог
+          </span>
+          <span className="text-gray-700 font-medium">{dep.toLocaleString('ru-RU')} ₽</span>
+        </div>
+        <div className="flex items-center justify-between border-t border-blue-100 pt-1 mt-1">
+          <span className="text-sm font-semibold text-blue-900">Итого по позиции</span>
+          <span className="text-sm font-bold text-blue-900">{total.toLocaleString('ru-RU')} ₽</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
 }
 
 export default function CreateRentalOrderPage() {
@@ -73,6 +164,8 @@ export default function CreateRentalOrderPage() {
   const [showProductSearch, setShowProductSearch] = useState(false);
   const [customerSearch, setCustomerSearch] = useState('');
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
+
+  const pricingTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
   const { data: products = [] } = useQuery<any[]>({
     queryKey: ['products-admin'],
@@ -98,44 +191,67 @@ export default function CreateRentalOrderPage() {
     c.phone?.includes(customerSearch)
   );
 
-  const checkAvailability = useCallback(async (item: OrderItem, index: number) => {
+  const fetchPricing = useCallback(async (item: OrderItem, index: number) => {
+    if (!item.startDate || !item.endDate || !item.productId) {
+      setItems(prev => prev.map((it, i) => i === index ? { ...it, pricingStatus: 'no_dates' as PricingStatus, pricing: null } : it));
+      return;
+    }
+    setItems(prev => prev.map((it, i) => i === index ? { ...it, pricingStatus: 'loading' as PricingStatus } : it));
+    try {
+      const res: any = await api.get(
+        `/availability/pricing?productId=${item.productId}&startDate=${item.startDate}&endDate=${item.endDate}`
+      );
+      setItems(prev => prev.map((it, i) => {
+        if (i !== index) return it;
+        const found = res.tariffFound !== false && res.basePrice > 0;
+        return { ...it, pricing: res, pricingStatus: found ? 'ok' : 'no_tariff' };
+      }));
+    } catch {
+      setItems(prev => prev.map((it, i) => i === index ? { ...it, pricingStatus: 'error' as PricingStatus, pricing: null } : it));
+    }
+  }, []);
+
+  const fetchAvailability = useCallback(async (item: OrderItem, index: number) => {
     if (!item.startDate || !item.endDate || !item.productId) return;
     setItems(prev => prev.map((it, i) => i === index ? { ...it, checkingAvailability: true } : it));
     try {
       const res: any = await api.get(
         `/availability/product?productId=${item.productId}&startDate=${item.startDate}&endDate=${item.endDate}&quantity=${item.quantity}`
       );
-      setItems(prev => prev.map((it, i) => {
-        if (i !== index) return it;
-        const days = calcDays(it.startDate, it.endDate);
-        return { ...it, available: res.available, checkingAvailability: false, totalPrice: it.pricePerDay * days * it.quantity };
-      }));
+      setItems(prev => prev.map((it, i) => i === index ? { ...it, available: res.available, checkingAvailability: false } : it));
     } catch {
       setItems(prev => prev.map((it, i) => i === index ? { ...it, checkingAvailability: false, available: null } : it));
     }
   }, []);
 
+  const schedulePricing = useCallback((item: OrderItem, index: number) => {
+    if (pricingTimers.current[index]) clearTimeout(pricingTimers.current[index]);
+    pricingTimers.current[index] = setTimeout(() => {
+      fetchPricing(item, index);
+      fetchAvailability(item, index);
+    }, 500);
+  }, [fetchPricing, fetchAvailability]);
+
   const addProduct = (product: any) => {
     const newItem: OrderItem = {
       productId: product.id,
       productName: product.name,
-      pricePerDay: Number(product.pricePerDay || product.price || 0),
       quantity: 1,
       startDate: startDate || '',
       endDate: endDate || '',
-      totalPrice: 0,
       available: null,
       checkingAvailability: false,
+      pricingStatus: (startDate && endDate) ? 'loading' : 'no_dates',
+      pricing: null,
     };
-    const days = calcDays(newItem.startDate, newItem.endDate);
-    newItem.totalPrice = newItem.pricePerDay * days * newItem.quantity;
-    const newItems = [...items, newItem];
-    setItems(newItems);
+    setItems(prev => {
+      const updated = [...prev, newItem];
+      const idx = updated.length - 1;
+      setTimeout(() => schedulePricing(newItem, idx), 50);
+      return updated;
+    });
     setProductSearch('');
     setShowProductSearch(false);
-    if (newItem.startDate && newItem.endDate) {
-      setTimeout(() => checkAvailability(newItem, newItems.length - 1), 100);
-    }
   };
 
   const updateItem = (index: number, field: keyof OrderItem, value: any) => {
@@ -144,31 +260,34 @@ export default function CreateRentalOrderPage() {
         if (i !== index) return it;
         const newIt = { ...it, [field]: value };
         if (field === 'quantity' || field === 'startDate' || field === 'endDate') {
-          const days = calcDays(newIt.startDate, newIt.endDate);
-          newIt.totalPrice = newIt.pricePerDay * days * newIt.quantity;
           newIt.available = null;
+          newIt.pricingStatus = (!newIt.startDate || !newIt.endDate) ? 'no_dates' : 'loading';
         }
         return newIt;
       });
       const item = updated[index];
-      if ((field === 'quantity' || field === 'startDate' || field === 'endDate') && item.startDate && item.endDate) {
-        setTimeout(() => checkAvailability(item, index), 500);
+      if (field === 'quantity' || field === 'startDate' || field === 'endDate') {
+        schedulePricing(item, index);
       }
       return updated;
     });
   };
 
   const applyDatesToAll = () => {
-    setItems(prev => prev.map(it => {
-      const days = calcDays(startDate, endDate);
-      return { ...it, startDate, endDate, totalPrice: it.pricePerDay * days * it.quantity, available: null };
-    }));
-    items.forEach((_, i) => setTimeout(() => checkAvailability({ ...items[i], startDate, endDate }, i), 200 * i));
+    if (!startDate || !endDate) return;
+    setItems(prev => {
+      const updated = prev.map(it => ({ ...it, startDate, endDate, available: null, pricingStatus: 'loading' as PricingStatus }));
+      updated.forEach((item, i) => setTimeout(() => schedulePricing(item, i), 200 * i));
+      return updated;
+    });
   };
 
-  const totalAmount = items.reduce((sum, it) => sum + (it.totalPrice || 0), 0);
-  const allAvailable = items.length > 0 && items.every(it => it.available !== false);
+  const totalAmount = items.reduce((sum, it) => sum + itemTotal(it), 0);
+  const totalDeposit = items.reduce((sum, it) => sum + itemDeposit(it), 0);
   const hasUnavailable = items.some(it => it.available === false);
+  const hasPricingIssue = items.some(it => it.pricingStatus === 'no_tariff' || it.pricingStatus === 'error');
+  const hasPendingPricing = items.some(it => it.pricingStatus === 'loading');
+  const allPricingOk = items.length > 0 && items.every(it => it.pricingStatus === 'ok');
 
   const createMut = useMutation({
     mutationFn: () => api.post('/orders', {
@@ -188,7 +307,7 @@ export default function CreateRentalOrderPage() {
         quantity: it.quantity,
         startDate: it.startDate || undefined,
         endDate: it.endDate || undefined,
-        totalPrice: it.totalPrice,
+        totalPrice: itemTotal(it),
       })),
     }),
     onSuccess: (res: any) => {
@@ -198,7 +317,7 @@ export default function CreateRentalOrderPage() {
     onError: (e: any) => toast({ title: 'Ошибка создания заказа', description: e.message, variant: 'destructive' }),
   });
 
-  const canSubmit = customerName.trim() && items.length > 0 && !hasUnavailable;
+  const canSubmit = customerName.trim() && items.length > 0 && !hasUnavailable && !hasPricingIssue && !hasPendingPricing;
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -264,7 +383,7 @@ export default function CreateRentalOrderPage() {
           <F label="Телефон">
             <PhoneInput value={customerPhone} onChange={setCustomerPhone} className={inputCls} />
           </F>
-          <F label="Email" >
+          <F label="Email">
             <input value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
               placeholder="ivan@example.com" type="email" className={inputCls} />
           </F>
@@ -281,23 +400,25 @@ export default function CreateRentalOrderPage() {
             <input type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)} className={inputCls} />
           </F>
         </div>
-        {startDate && endDate && items.length > 0 && (
-          <button onClick={applyDatesToAll}
-            className="text-xs text-blue-600 hover:underline">
-            Применить даты ко всем товарам
-          </button>
-        )}
         {startDate && endDate && (
-          <div className="text-sm text-gray-500 bg-blue-50 px-3 py-2 rounded-lg">
-            Длительность: <strong>{calcDays(startDate, endDate)} дн.</strong>
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-500 bg-blue-50 px-3 py-2 rounded-lg">
+              Длительность: <strong>{calcDays(startDate, endDate)} дн.</strong>
+            </div>
+            {items.length > 0 && (
+              <button onClick={applyDatesToAll}
+                className="text-xs text-blue-600 hover:underline">
+                Применить ко всем товарам
+              </button>
+            )}
           </div>
         )}
       </Section>
 
       {/* Products */}
-      <Section title="Товары" icon={Package}>
+      <Section title="Товары и расчёт" icon={Package}>
         {items.length > 0 && (
-          <div className="space-y-2 mb-3">
+          <div className="space-y-3 mb-3">
             {items.map((item, i) => (
               <div key={i} className="border border-gray-100 rounded-xl p-3 bg-gray-50/50">
                 <div className="flex items-start justify-between gap-2 mb-2">
@@ -313,7 +434,7 @@ export default function CreateRentalOrderPage() {
                     )}
                     <span className="font-medium text-sm text-gray-900 truncate">{item.productName}</span>
                     {item.available === false && (
-                      <span className="text-xs text-red-600 flex-shrink-0">нет в наличии</span>
+                      <span className="text-xs text-red-600 flex-shrink-0 bg-red-50 px-1.5 py-0.5 rounded">нет в наличии</span>
                     )}
                   </div>
                   <button onClick={() => setItems(prev => prev.filter((_, idx) => idx !== i))}
@@ -341,12 +462,7 @@ export default function CreateRentalOrderPage() {
                       className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                 </div>
-                <div className="mt-2 text-right text-sm text-gray-600">
-                  {item.pricePerDay > 0 && (
-                    <span className="text-gray-400 text-xs">{item.pricePerDay.toLocaleString('ru-RU')} ₽/день × {item.quantity} шт. × {calcDays(item.startDate, item.endDate)} дн. = </span>
-                  )}
-                  <span className="font-semibold text-gray-900">{item.totalPrice.toLocaleString('ru-RU')} ₽</span>
-                </div>
+                <PricingInfo item={item} />
               </div>
             ))}
           </div>
@@ -396,7 +512,13 @@ export default function CreateRentalOrderPage() {
         {hasUnavailable && (
           <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-xl">
             <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-            <p className="text-sm text-red-700">Некоторые товары недоступны на выбранные даты. Измените даты или уберите недоступные товары.</p>
+            <p className="text-sm text-red-700">Некоторые товары недоступны на выбранные даты</p>
+          </div>
+        )}
+        {hasPricingIssue && (
+          <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+            <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+            <p className="text-sm text-amber-700">Для некоторых товаров не найден тариф — создание заказа недоступно</p>
           </div>
         )}
       </Section>
@@ -451,20 +573,64 @@ export default function CreateRentalOrderPage() {
 
       {/* Summary */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900">Итого</h3>
-          <div className="text-2xl font-bold text-gray-900">{totalAmount.toLocaleString('ru-RU')} ₽</div>
-        </div>
+        <h3 className="font-semibold text-gray-900 mb-4">Итоги заказа</h3>
+
+        {items.length === 0 && (
+          <p className="text-sm text-gray-400 text-center py-4">Добавьте товары, чтобы увидеть расчёт</p>
+        )}
+
         {items.length > 0 && (
-          <div className="text-sm text-gray-500 space-y-1 mb-4">
+          <div className="space-y-2 mb-4">
             {items.map((it, i) => (
-              <div key={i} className="flex justify-between">
-                <span>{it.productName} × {it.quantity}</span>
-                <span>{it.totalPrice.toLocaleString('ru-RU')} ₽</span>
+              <div key={i} className="flex justify-between text-sm">
+                <span className="text-gray-600">
+                  {it.productName} × {it.quantity}
+                  {it.pricing && it.pricing.tariffFound && (
+                    <span className="text-xs text-gray-400 ml-1">({TARIFF_LABELS[it.pricing.tariffType] || it.pricing.tariffType})</span>
+                  )}
+                </span>
+                <span className={it.pricingStatus === 'ok' ? 'font-medium text-gray-900' : 'text-gray-300 italic text-xs self-center'}>
+                  {it.pricingStatus === 'ok'
+                    ? `${itemTotal(it).toLocaleString('ru-RU')} ₽`
+                    : it.pricingStatus === 'loading'
+                      ? 'Расчёт...'
+                      : it.pricingStatus === 'no_dates'
+                        ? 'Укажите даты'
+                        : 'Нет тарифа'}
+                </span>
               </div>
             ))}
+
+            <div className="border-t border-gray-100 pt-2 mt-2 space-y-1.5">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Аренда (subtotal)</span>
+                <span className={allPricingOk ? 'font-medium text-gray-900' : 'text-gray-300'}>
+                  {allPricingOk ? `${totalAmount.toLocaleString('ru-RU')} ₽` : '—'}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Залог (итого)</span>
+                <span className={allPricingOk ? 'font-medium text-gray-900' : 'text-gray-300'}>
+                  {allPricingOk ? `${totalDeposit.toLocaleString('ru-RU')} ₽` : '—'}
+                </span>
+              </div>
+              <div className="flex justify-between text-base font-bold border-t border-gray-100 pt-2 mt-1">
+                <span className="text-gray-900">Итого к оплате</span>
+                <span className={allPricingOk ? 'text-blue-700' : 'text-gray-300'}>
+                  {allPricingOk ? `${totalAmount.toLocaleString('ru-RU')} ₽` : 'Цена не рассчитана'}
+                </span>
+              </div>
+            </div>
           </div>
         )}
+
+        {hasPendingPricing && (
+          <div className="flex items-center gap-2 text-xs text-gray-400 mb-3">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Пересчёт стоимости...
+          </div>
+        )}
+
         <div className="flex gap-3">
           <button onClick={() => navigate('/orders')}
             className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
@@ -478,12 +644,21 @@ export default function CreateRentalOrderPage() {
             {createMut.isPending ? 'Создание...' : 'Создать заказ'}
           </button>
         </div>
-        {!customerName.trim() && (
-          <p className="text-xs text-red-500 mt-2 text-center">Укажите имя клиента</p>
-        )}
-        {items.length === 0 && (
-          <p className="text-xs text-red-500 mt-2 text-center">Добавьте хотя бы один товар</p>
-        )}
+
+        <div className="mt-2 space-y-1">
+          {!customerName.trim() && (
+            <p className="text-xs text-red-500 text-center">Укажите имя клиента</p>
+          )}
+          {items.length === 0 && (
+            <p className="text-xs text-red-500 text-center">Добавьте хотя бы один товар</p>
+          )}
+          {hasPricingIssue && (
+            <p className="text-xs text-amber-600 text-center">Исправьте ошибки расчёта цены</p>
+          )}
+          {hasPendingPricing && (
+            <p className="text-xs text-gray-400 text-center">Дождитесь завершения расчёта</p>
+          )}
+        </div>
       </div>
     </div>
   );

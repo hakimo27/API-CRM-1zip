@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, Inject, Optional } from "@nestjs/common";
 import { BusinessNotificationsService } from "../notifications/business-notifications.service.js";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
 import { chatSessionsTable, chatMessagesTable } from "@workspace/db";
 
@@ -98,20 +98,35 @@ export class ChatService {
 
     if (!session) throw new NotFoundException("Сессия не найдена");
 
+    const wasReopened = session.status === "closed" && sender === "customer";
+
     const [message] = await this.db
       .insert(chatMessagesTable)
-      .values({
-        sessionId,
-        content,
-        sender,
-        senderName,
-      })
+      .values({ sessionId, content, sender, senderName })
       .returning();
 
-    await this.db
-      .update(chatSessionsTable)
-      .set({ updatedAt: new Date() })
-      .where(eq(chatSessionsTable.id, sessionId));
+    if (sender === "customer") {
+      if (wasReopened) {
+        await this.db
+          .update(chatSessionsTable)
+          .set({ status: "open", unreadCount: 1, updatedAt: new Date(), lastMessageAt: new Date() })
+          .where(eq(chatSessionsTable.id, sessionId));
+      } else {
+        await this.db
+          .update(chatSessionsTable)
+          .set({
+            unreadCount: sql`${chatSessionsTable.unreadCount} + 1`,
+            updatedAt: new Date(),
+            lastMessageAt: new Date(),
+          })
+          .where(eq(chatSessionsTable.id, sessionId));
+      }
+    } else {
+      await this.db
+        .update(chatSessionsTable)
+        .set({ updatedAt: new Date(), lastMessageAt: new Date() })
+        .where(eq(chatSessionsTable.id, sessionId));
+    }
 
     if (sender === "customer") {
       this.businessNotifications?.notifyNewMessage(
@@ -120,7 +135,26 @@ export class ChatService {
       ).catch(() => {});
     }
 
+    if (wasReopened) {
+      this.businessNotifications?.notifyNewChat({
+        id: sessionId,
+        channel: session.channel,
+        metadata: session.metadata as Record<string, unknown> | null,
+      }).catch(() => {});
+    }
+
     return message!;
+  }
+
+  async markAsRead(sessionId: number) {
+    const [updated] = await this.db
+      .update(chatSessionsTable)
+      .set({ unreadCount: 0 })
+      .where(eq(chatSessionsTable.id, sessionId))
+      .returning();
+
+    if (!updated) throw new NotFoundException("Сессия не найдена");
+    return { ok: true };
   }
 
   async updateSessionStatus(sessionId: number, status: string) {
