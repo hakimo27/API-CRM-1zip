@@ -136,15 +136,53 @@ export class ToursService {
     return { message: "Тур удалён" };
   }
 
+  private sanitizeTourDateData(data: any): any {
+    const result: any = { ...data };
+
+    // Drizzle PgTimestamp requires Date objects — never raw strings
+    if (result.startDate !== undefined && result.startDate !== null && result.startDate !== '') {
+      const d = new Date(result.startDate);
+      if (isNaN(d.getTime())) throw new BadRequestException(`Неверный формат startDate: ${result.startDate}`);
+      result.startDate = d;
+    }
+    if (result.endDate !== undefined && result.endDate !== null && result.endDate !== '') {
+      const d = new Date(result.endDate);
+      if (isNaN(d.getTime())) throw new BadRequestException(`Неверный формат endDate: ${result.endDate}`);
+      result.endDate = d;
+    }
+
+    // instructorId: empty string → null, else cast to number
+    if (result.instructorId === '' || result.instructorId === undefined) {
+      result.instructorId = null;
+    } else if (result.instructorId !== null) {
+      result.instructorId = Number(result.instructorId);
+      if (isNaN(result.instructorId)) result.instructorId = null;
+    }
+
+    // Numeric fields: ensure numbers not strings where needed
+    if (result.seatsTotal !== undefined) result.seatsTotal = Number(result.seatsTotal) || 1;
+    if (result.seatsBooked !== undefined) result.seatsBooked = Number(result.seatsBooked) || 0;
+
+    // Remove frontend-only fields that don't exist in the DB table
+    delete result.tour;
+    delete result.instructor;
+
+    return result;
+  }
+
   async createDate(data: any) {
-    const [created] = await this.db.insert(tourDatesTable).values(data).returning();
+    const sanitized = this.sanitizeTourDateData(data);
+    console.log('[ToursService] createDate payload:', JSON.stringify(sanitized));
+    const [created] = await this.db.insert(tourDatesTable).values(sanitized).returning();
     return created;
   }
 
   async updateDate(dateId: number, data: any) {
+    const sanitized = this.sanitizeTourDateData(data);
+    console.log('[ToursService] updateDate id=%d payload:', dateId, JSON.stringify(sanitized));
     const [updated] = await this.db
       .update(tourDatesTable)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...sanitized, updatedAt: new Date() })
       .where(eq(tourDatesTable.id, dateId))
       .returning();
     if (!updated) throw new NotFoundException("Дата тура не найдена");
