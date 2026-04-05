@@ -4,10 +4,12 @@ import { useQuery } from '@tanstack/react-query';
 import { Search, SlidersHorizontal, X, Star } from 'lucide-react';
 import { api } from '@/lib/api';
 
+interface ProductImage { id: number; url: string; alt: string | null; }
 interface Product {
   id: number; name: string; slug: string; categoryName: string;
   shortDescription: string | null; capacity: number | null;
-  featured: boolean; badge: string | null; mainImage: string | null;
+  featured: boolean; badge: string | null;
+  images: ProductImage[];
   tariffs: Array<{ id: number; type: string; label: string; pricePerDay: number }>;
 }
 
@@ -121,13 +123,22 @@ export default function CatalogPage() {
                 : null;
               return (
                 <div key={product.id} className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all border border-gray-100 overflow-hidden group">
-                  <div className="relative h-44 bg-gradient-to-br from-blue-100 to-cyan-50 flex items-center justify-center">
+                  <div className="relative h-44 bg-gradient-to-br from-blue-100 to-cyan-50 flex items-center justify-center overflow-hidden">
                     {product.badge && (
-                      <span className="absolute top-3 left-3 px-2 py-1 bg-blue-600 text-white text-xs font-bold rounded-full">
+                      <span className="absolute top-3 left-3 z-10 px-2 py-1 bg-blue-600 text-white text-xs font-bold rounded-full">
                         {product.badge}
                       </span>
                     )}
-                    <span className="text-6xl opacity-60">🛶</span>
+                    {product.images?.[0]?.url ? (
+                      <img
+                        src={product.images[0].url}
+                        alt={product.images[0].alt || product.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    ) : (
+                      <span className="text-6xl opacity-40">🛶</span>
+                    )}
                   </div>
                   <div className="p-4">
                     <div className="text-xs text-blue-600 font-medium mb-1">{product.categoryName}</div>

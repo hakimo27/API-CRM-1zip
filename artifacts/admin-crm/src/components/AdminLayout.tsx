@@ -27,7 +27,6 @@ const NAV_GROUPS = [
       { href: '/sale-orders', label: 'Заказы продажи', icon: ShoppingCart },
       { href: '/tour-bookings', label: 'Бронирования туров', icon: CalendarCheck },
       { href: '/chat', label: 'Чат', icon: MessageSquare },
-      { href: '/logs', label: 'Логи', icon: Activity },
     ],
   },
   {
@@ -68,6 +67,7 @@ const NAV_GROUPS = [
     items: [
       { href: '/users', label: 'Пользователи', icon: User },
       { href: '/settings', label: 'Настройки', icon: Settings },
+      { href: '/logs', label: 'Логи', icon: Activity },
     ],
   },
 ];
@@ -120,7 +120,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <span className="text-white text-base">🛶</span>
           </div>
           <div className="min-w-0">
-            <div className="font-bold text-gray-900 text-sm">КаякРент</div>
+            <div className="font-bold text-gray-900 text-sm">Байдабаза</div>
             <div className="text-xs text-gray-400">Панель управления</div>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="ml-auto lg:hidden flex-shrink-0">

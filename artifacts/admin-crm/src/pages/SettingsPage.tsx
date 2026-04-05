@@ -38,7 +38,7 @@ const TABS: TabDef[] = [
       { key: 'general.tagline',         label: 'Подзаголовок главной',    hint: 'Текст в hero-секции главной страницы' },
       { key: 'general.site_name',       label: 'Название в браузере',     hint: 'Title вкладки и SEO' },
       { key: 'general.footer_text',     label: 'Текст в подвале',         hint: 'Краткое описание в footer' },
-      { key: 'general.copyright',       label: 'Copyright строка',        hint: 'Например: КаякРент 2025' },
+      { key: 'general.copyright',       label: 'Copyright строка',        hint: 'Например: Байдабаза 2025' },
     ],
   },
   {
@@ -48,11 +48,11 @@ const TABS: TabDef[] = [
     fields: [
       { key: 'contacts.phone',          label: 'Телефон (основной)',      type: 'tel',      placeholder: '+7 (999) 000-00-00', section: 'Телефоны и мессенджеры' },
       { key: 'contacts.phone2',         label: 'Телефон (дополнительный)',type: 'tel',      placeholder: '+7 (999) 000-00-00' },
-      { key: 'contacts.telegram',       label: 'Telegram',                hint: 'Username без @, например: kayakrent',          placeholder: 'kayakrent' },
+      { key: 'contacts.telegram',       label: 'Telegram',                hint: 'Username без @, например: baidabase',          placeholder: 'baidabase' },
       { key: 'contacts.vk',             label: 'ВКонтакте',               type: 'url',      placeholder: 'https://vk.com/...' },
       { key: 'contacts.max',            label: 'MAX (мессенджер)',         placeholder: 'Номер или ссылка' },
       { key: 'contacts.whatsapp',       label: 'WhatsApp',                hint: 'Номер для ссылки wa.me (без +)',               placeholder: '79990000000' },
-      { key: 'contacts.email',          label: 'Email',                    type: 'text',     placeholder: 'info@kayakrent.ru', section: 'Адрес и расположение' },
+      { key: 'contacts.email',          label: 'Email',                    type: 'text',     placeholder: 'info@baidabase.ru', section: 'Адрес и расположение' },
       { key: 'contacts.address',        label: 'Адрес',                   placeholder: 'г. Москва, ул. Речная, 1' },
       { key: 'contacts.city',           label: 'Город',                   placeholder: 'Москва' },
       { key: 'contacts.schedule',       label: 'График работы',           placeholder: 'Пн–Вс: 09:00–21:00' },
@@ -157,7 +157,7 @@ const TABS: TabDef[] = [
       { key: 'notifications.email_port',    label: 'SMTP Port',         type: 'number', placeholder: '587' },
       { key: 'notifications.email_user',    label: 'SMTP Логин',        placeholder: 'user@gmail.com' },
       { key: 'notifications.email_password',label: 'SMTP Пароль',       type: 'password' },
-      { key: 'notifications.email_from',    label: 'Email отправителя', placeholder: 'noreply@kayakrent.ru', hint: 'Адрес "От кого" в письмах' },
+      { key: 'notifications.email_from',    label: 'Email отправителя', placeholder: 'noreply@baidabase.ru', hint: 'Адрес "От кого" в письмах' },
     ],
   },
   {

@@ -1,6 +1,6 @@
 {
-  "name": "КаякРент CRM",
-  "short_name": "CRM",
+  "name": "Байдабаза CRM",
+  "short_name": "Байдабаза",
   "description": "Панель управления прокатом водного снаряжения",
   "start_url": "/crm/",
   "display": "standalone",

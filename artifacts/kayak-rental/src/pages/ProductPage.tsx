@@ -105,14 +105,37 @@ export default function ProductPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
         {/* Image */}
         <div>
-          <div className="h-80 md:h-[420px] bg-gradient-to-br from-blue-100 to-cyan-50 rounded-2xl flex items-center justify-center relative">
+          <div className="h-80 md:h-[420px] bg-gradient-to-br from-blue-100 to-cyan-50 rounded-2xl overflow-hidden relative">
             {product.badge && (
-              <span className="absolute top-4 left-4 px-3 py-1 bg-blue-600 text-white text-sm font-bold rounded-full">
+              <span className="absolute top-4 left-4 z-10 px-3 py-1 bg-blue-600 text-white text-sm font-bold rounded-full">
                 {product.badge}
               </span>
             )}
-            <span className="text-9xl opacity-50">🛶</span>
+            {product.images?.[0]?.url ? (
+              <img
+                src={product.images[0].url}
+                alt={product.images[0].alt || product.name}
+                className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="text-9xl opacity-40">🛶</span>
+              </div>
+            )}
           </div>
+          {product.images && product.images.length > 1 && (
+            <div className="flex gap-2 mt-3 overflow-x-auto">
+              {product.images.map((img, idx) => (
+                <img
+                  key={img.id}
+                  src={img.url}
+                  alt={img.alt || `${product.name} ${idx + 1}`}
+                  className="h-16 w-20 object-cover rounded-lg border-2 border-transparent hover:border-blue-400 cursor-pointer flex-shrink-0"
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Details */}

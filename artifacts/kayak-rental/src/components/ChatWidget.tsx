@@ -1,101 +1,128 @@
-import { useState, useRef, useEffect } from "react";
-import { MessageSquare, X, Send, ChevronDown } from "lucide-react";
-import { useCreateChatSession, useGetChatMessages, useSendChatMessage, getGetChatMessagesQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { CHAT_QUICK_REPLIES } from "@/lib/constants";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { MessageSquare, X, Send, ChevronDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const SESSION_KEY = "baidabase_chat_session_id";
+
+interface ChatMessage {
+  id: number;
+  sender: string;
+  content: string;
+  createdAt: string;
+}
+
+async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetch("/api" + path, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status}: ${text}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+async function resolveSessionId(): Promise<number> {
+  const stored = localStorage.getItem(SESSION_KEY);
+  if (stored) {
+    const id = parseInt(stored, 10);
+    if (!isNaN(id)) {
+      try {
+        await apiFetch<ChatMessage[]>(`/chat/sessions/${id}/messages/public`);
+        return id;
+      } catch {
+        localStorage.removeItem(SESSION_KEY);
+      }
+    }
+  }
+  const session = await apiFetch<{ id: number; status: string }>("/chat/sessions", {
+    method: "POST",
+    body: JSON.stringify({ channel: "web", metadata: { page: window.location.pathname } }),
+  });
+  localStorage.setItem(SESSION_KEY, String(session.id));
+  return session.id;
+}
+
+const QUICK_REPLIES = ["Аренда байдарки", "Цены и тарифы", "Доставка", "Туры"];
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
-  const [sessionToken, setSessionToken] = useState<string | null>(() =>
-    localStorage.getItem("chat_session_token"),
-  );
   const [sessionId, setSessionId] = useState<number | null>(() => {
-    const id = localStorage.getItem("chat_session_id");
-    return id ? parseInt(id) : null;
+    const stored = localStorage.getItem(SESSION_KEY);
+    const id = stored ? parseInt(stored, 10) : NaN;
+    return isNaN(id) ? null : id;
   });
-  const [lastMessageId, setLastMessageId] = useState<number | undefined>(undefined);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
-  const [localMessages, setLocalMessages] = useState<
-    Array<{ id: number; sender: string; content: string; createdAt: string }>
-  >([]);
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const queryClient = useQueryClient();
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const createSession = useCreateChatSession();
-  const sendMessage = useSendChatMessage();
-
-  const { data: messages } = useGetChatMessages(
-    sessionToken ?? "none",
-    { query: { since: lastMessageId } },
-    {
-      query: {
-        enabled: !!sessionToken && open,
-        refetchInterval: 5000,
-        queryKey: getGetChatMessagesQueryKey(sessionToken ?? "none", { since: lastMessageId }),
-        onSuccess: (data: any) => {
-          if (data && data.length > 0) {
-            setLocalMessages((prev) => {
-              const existingIds = new Set(prev.map((m) => m.id));
-              const newMsgs = data.filter((m: any) => !existingIds.has(m.id));
-              if (newMsgs.length === 0) return prev;
-              const maxId = Math.max(...data.map((m: any) => m.id));
-              setLastMessageId(maxId);
-              return [...prev, ...newMsgs];
-            });
-          }
-        },
-      },
-    },
-  );
-
-  useEffect(() => {
-    if (messages && messages.length > 0) {
-      setLocalMessages((prev) => {
-        const existingIds = new Set(prev.map((m) => m.id));
-        const newMsgs = messages.filter((m) => !existingIds.has(m.id));
-        if (newMsgs.length === 0) return prev;
-        return [...prev, ...newMsgs];
-      });
-      const maxId = Math.max(...messages.map((m) => m.id));
-      if (!lastMessageId || maxId > lastMessageId) {
-        setLastMessageId(maxId);
-      }
+  const fetchMessages = useCallback(async (sid: number) => {
+    try {
+      const data = await apiFetch<ChatMessage[]>(`/chat/sessions/${sid}/messages/public`);
+      setMessages(data);
+    } catch (e) {
+      console.warn("Chat: failed to fetch messages", e);
     }
-  }, [messages]);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [localMessages]);
+  }, [messages]);
+
+  useEffect(() => {
+    if (open && sessionId) {
+      fetchMessages(sessionId);
+      pollRef.current = setInterval(() => fetchMessages(sessionId), 5000);
+    }
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [open, sessionId, fetchMessages]);
 
   async function openChat() {
     setOpen(true);
-    if (!sessionToken) {
-      const data = await createSession.mutateAsync({});
-      localStorage.setItem("chat_session_token", data.sessionToken);
-      localStorage.setItem("chat_session_id", String(data.id));
-      setSessionToken(data.sessionToken);
-      setSessionId(data.id);
+    if (!sessionId) {
+      setLoading(true);
+      try {
+        const sid = await resolveSessionId();
+        setSessionId(sid);
+        await fetchMessages(sid);
+      } catch (e) {
+        console.error("Chat: failed to init session", e);
+      } finally {
+        setLoading(false);
+      }
     }
   }
 
   async function send(text: string) {
-    if (!text.trim() || !sessionToken) return;
     const content = text.trim();
+    if (!content || !sessionId) return;
     setInputText("");
 
-    const optimistic = {
+    const optimistic: ChatMessage = {
       id: Date.now(),
       sender: "customer",
       content,
       createdAt: new Date().toISOString(),
     };
-    setLocalMessages((prev) => [...prev, optimistic]);
+    setMessages((prev) => [...prev, optimistic]);
+    setSending(true);
 
     try {
-      await sendMessage.mutateAsync({ sessionId: sessionToken, data: { content } });
+      await apiFetch(`/chat/sessions/${sessionId}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ content, sender: "customer" }),
+      });
+      await fetchMessages(sessionId);
     } catch (e) {
-      console.error("Send failed", e);
+      console.error("Chat: failed to send", e);
+    } finally {
+      setSending(false);
     }
   }
 
@@ -127,12 +154,19 @@ export default function ChatWidget() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-48 max-h-80 bg-gray-50">
-            {localMessages.length === 0 && (
+            {loading && (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+              </div>
+            )}
+
+            {!loading && messages.length === 0 && (
               <div className="text-center text-gray-400 text-sm py-4">
                 Начните диалог с менеджером
               </div>
             )}
-            {localMessages.map((msg) => (
+
+            {messages.map((msg) => (
               <div
                 key={msg.id}
                 className={cn("flex", msg.sender === "customer" ? "justify-end" : "justify-start")}
@@ -153,11 +187,12 @@ export default function ChatWidget() {
           </div>
 
           <div className="px-3 py-2 border-t border-gray-100 flex flex-wrap gap-1.5">
-            {CHAT_QUICK_REPLIES.slice(0, 3).map((r) => (
+            {QUICK_REPLIES.map((r) => (
               <button
                 key={r}
                 onClick={() => send(r)}
-                className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2.5 py-1 hover:bg-blue-100 transition-colors"
+                disabled={sending || loading}
+                className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2.5 py-1 hover:bg-blue-100 transition-colors disabled:opacity-50"
               >
                 {r}
               </button>
@@ -169,16 +204,17 @@ export default function ChatWidget() {
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && send(inputText)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send(inputText)}
               placeholder="Сообщение..."
-              className="flex-1 text-sm border border-gray-200 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={loading}
+              className="flex-1 text-sm border border-gray-200 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
             />
             <button
               onClick={() => send(inputText)}
-              disabled={!inputText.trim()}
+              disabled={!inputText.trim() || sending || loading}
               className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-full w-9 h-9 flex items-center justify-center shrink-0 transition-colors"
             >
-              <Send className="w-4 h-4" />
+              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
           </div>
         </div>

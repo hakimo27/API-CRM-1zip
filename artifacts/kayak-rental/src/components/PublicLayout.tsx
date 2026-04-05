@@ -37,7 +37,7 @@ function LogoMark({ name, logoUrl }: { name: string; logoUrl: string }) {
   return (
     <div className="flex items-center gap-2">
       <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-        <span className="text-white font-bold text-sm leading-none">КР</span>
+        <span className="text-white font-bold text-sm leading-none">БД</span>
       </div>
       <span className="font-bold text-lg text-gray-900">{name}</span>
     </div>
@@ -54,7 +54,7 @@ function LogoMarkLight({ name, logoUrl, logoLightUrl }: { name: string; logoUrl:
   return (
     <div className="flex items-center gap-2">
       <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
-        <span className="text-white font-bold text-sm leading-none">КР</span>
+        <span className="text-white font-bold text-sm leading-none">БД</span>
       </div>
       <span className="font-bold text-lg text-white">{name}</span>
     </div>
@@ -68,7 +68,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const { data: settings = {} } = usePublicSettings();
 
-  const companyName  = str(settings['general.company_name'], 'КаякРент');
+  const companyName  = str(settings['general.company_name'], 'Байдабаза');
   const phone        = str(settings['contacts.phone'], '+7 (999) 000-00-00');
   const phone2       = str(settings['contacts.phone2']);
   const email        = str(settings['contacts.email']);
@@ -77,7 +77,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const tgUsername   = str(settings['contacts.telegram']);
   const vkUrl        = str(settings['contacts.vk']);
   const footerText   = str(settings['general.footer_text'], 'Аренда байдарок, каноэ и SUP-досок в Москве и Подмосковье');
-  const copyright    = str(settings['general.copyright'], `КаякРент ${new Date().getFullYear()}`);
+  const copyright    = str(settings['general.copyright'], `Байдабаза ${new Date().getFullYear()}`);
   const logoUrl      = str(settings['branding.logo_url']);
   const logoLightUrl = str(settings['branding.logo_light_url']);
   const chatEnabled  = bool(settings['chat.enabled'], true);
