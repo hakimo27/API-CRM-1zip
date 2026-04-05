@@ -39,36 +39,46 @@ function bool(v: unknown, fallback = false): boolean {
 function LogoMark({ name, logoUrl }: { name: string; logoUrl: string }) {
   if (logoUrl) {
     return (
-      <img src={logoUrl} alt={name} className="h-8 sm:h-10 md:h-12 w-auto max-w-[120px] sm:max-w-[160px] object-contain" />
+      <img
+        src={logoUrl}
+        alt={name}
+        style={{ height: 'clamp(36px, 5vw, 52px)', width: 'auto', maxWidth: '200px', objectFit: 'contain' }}
+      />
     );
   }
   return (
     <div className="flex items-center gap-2">
-      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
-        <span className="text-white font-bold text-xs sm:text-sm leading-none">БД</span>
+      <div
+        className="bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0"
+        style={{ width: 'clamp(36px, 5vw, 44px)', height: 'clamp(36px, 5vw, 44px)' }}
+      >
+        <span className="text-white font-bold leading-none" style={{ fontSize: 'clamp(12px, 1.5vw, 16px)' }}>БД</span>
       </div>
-      <span className="font-bold text-base sm:text-lg text-gray-900">{name}</span>
+      <span className="font-bold text-gray-900" style={{ fontSize: 'clamp(16px, 2.5vw, 20px)' }}>{name}</span>
     </div>
   );
 }
 
 function LogoMarkLight({ name, logoUrl, logoLightUrl }: { name: string; logoUrl: string; logoLightUrl: string }) {
-  if (logoLightUrl) {
+  const src = logoLightUrl || logoUrl;
+  if (src) {
     return (
-      <img src={logoLightUrl} alt={name} className="h-8 sm:h-10 md:h-12 w-auto max-w-[120px] sm:max-w-[160px] object-contain" />
-    );
-  }
-  if (logoUrl) {
-    return (
-      <img src={logoUrl} alt={name} className="h-8 sm:h-10 md:h-12 w-auto max-w-[120px] sm:max-w-[160px] object-contain" />
+      <img
+        src={src}
+        alt={name}
+        style={{ height: 'clamp(36px, 5vw, 52px)', width: 'auto', maxWidth: '200px', objectFit: 'contain' }}
+      />
     );
   }
   return (
     <div className="flex items-center gap-2">
-      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-        <span className="text-white font-bold text-xs sm:text-sm leading-none">БД</span>
+      <div
+        className="bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0"
+        style={{ width: 'clamp(36px, 5vw, 44px)', height: 'clamp(36px, 5vw, 44px)' }}
+      >
+        <span className="text-white font-bold leading-none" style={{ fontSize: 'clamp(12px, 1.5vw, 16px)' }}>БД</span>
       </div>
-      <span className="font-bold text-base sm:text-lg text-white">{name}</span>
+      <span className="font-bold text-white" style={{ fontSize: 'clamp(16px, 2.5vw, 20px)' }}>{name}</span>
     </div>
   );
 }
