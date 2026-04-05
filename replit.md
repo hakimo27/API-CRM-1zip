@@ -175,6 +175,19 @@ Automates: certbot certonly → copy certs to docker/ssl/ → patch nginx-ssl.co
 - `artifacts/kayak-rental/public/sw.js` — registered at `/sw.js` with scope `/`
 - Both handle push events and show browser notifications even when app is not focused
 
+### PWA Files Structure
+
+| File | CRM path | Public site path |
+|------|----------|-----------------|
+| Manifest | `/crm/manifest.webmanifest` | `/manifest.webmanifest` |
+| Service Worker | `/crm/sw.js` (scope `/crm/`) | `/sw.js` (scope `/`) |
+| Offline page | `/crm/offline.html` | `/offline.html` |
+| Icons | `/crm/icons/icon-{192,512}.png` | `/icons/icon-{192,512}.png` |
+| Screenshots | `/crm/screenshots/{mobile,desktop}.png` | `/screenshots/{mobile,desktop}.png` |
+
+Both manifests include: `id`, `display_override`, `screenshots` (for Android full-dialog), `shortcuts`, `prefer_related_applications: false`.
+Nginx configs (`docker/nginx-admin.conf`, `docker/nginx-web.conf`) serve `*.webmanifest` with `application/manifest+json` and `sw.js` with `no-cache`.
+
 ### VAPID Keys (Web Push)
 - Stored as env vars: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
 - Service: `artifacts/api-server/src/notifications/push-notifications.service.ts`

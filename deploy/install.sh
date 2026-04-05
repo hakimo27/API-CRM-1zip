@@ -240,7 +240,24 @@ else
   success "VAPID keys configured — Web Push notifications enabled"
 fi
 
-# ── 15. Start web, admin, nginx ───────────────────────────────────────────────
+# ── 15. PWA readiness check ───────────────────────────────────────────────────
+info "Checking PWA assets..."
+PWA_OK=true
+for f in dist/public/sw.js dist/public/manifest.webmanifest dist/public/offline.html \
+          dist/public/icons/icon-192.png dist/public/icons/icon-512.png; do
+  if [ ! -f "$f" ]; then
+    warn "PWA asset missing: $f (will be built in Docker)"
+    PWA_OK=false
+  fi
+done
+if [ "$PWA_OK" = "true" ]; then
+  success "PWA assets verified"
+fi
+info "After deploy, verify PWA at: ${APP_URL:-http://YOUR_SERVER_IP}"
+info "  → Open Chrome → DevTools → Application → Manifest"
+info "  → Check: 'Installable' with no warnings"
+
+# ── 16. Start web, admin, nginx ───────────────────────────────────────────────
 info "Starting web, admin CRM, and nginx..."
 docker compose up -d web admin nginx
 success "All services started"
@@ -268,9 +285,15 @@ if [ "${BOOTSTRAP_SUPERADMIN_CREATE:-false}" = "true" ] && [ -n "${BOOTSTRAP_SUP
   echo ""
 fi
 echo -e "  ${YELLOW}Следующие шаги:${RESET}"
-echo -e "  • Подключить HTTPS: bash deploy/enable-ssl.sh ${DOMAIN:-YOUR_DOMAIN}"
-echo -e "  • Сменить пароль:   CRM → Профиль"
+echo -e "  • Подключить HTTPS:   bash deploy/enable-ssl.sh ${DOMAIN:-YOUR_DOMAIN}"
+echo -e "  • Сменить пароль:     CRM → Профиль"
 echo -e "  • Заполнить контакты: CRM → Настройки → Общие"
-echo -e "  • Тест Email:       POST /api/notifications/test-email (авторизация)"
+echo -e "  • Тест Email:         POST /api/notifications/test-email (авторизация)"
+echo ""
+echo -e "  ${YELLOW}PWA и Push-уведомления:${RESET}"
+echo -e "  • HTTPS обязателен для PWA install prompt и Push-уведомлений"
+echo -e "  • Проверка PWA:  Chrome → DevTools → Application → Manifest"
+echo -e "  • Включить Push: CRM → кнопка 🔔 в шапке (нужно разрешение браузера)"
+echo -e "  • VAPID ключи:   генерация в deploy/install.sh шаг 14"
 echo ""
 docker compose ps --format "table {{.Name}}\t{{.Status}}"

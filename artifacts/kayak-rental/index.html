@@ -7,10 +7,14 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#FF3C00" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Байдабаза" />
-    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <meta name="application-name" content="Байдабаза" />
+    <meta name="msapplication-TileColor" content="#FF3C00" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png" />
     <meta name="description" content="Аренда байдарок, каноэ и SUP-досок в Москве и Подмосковье. Более 100 единиц снаряжения. Доставка. Онлайн-бронирование." />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,7 +26,12 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+          navigator.serviceWorker.register('/sw.js', { scope: '/' })
+            .then(reg => {
+              console.log('[SW] Registered, scope:', reg.scope);
+              setInterval(() => reg.update(), 3600000);
+            })
+            .catch(err => console.warn('[SW] Registration failed:', err));
         });
       }
     </script>

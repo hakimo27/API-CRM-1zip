@@ -58,7 +58,17 @@ info "Checking services..."
 sleep 5
 docker compose ps
 
+# ── 6. Check VAPID keys still configured ─────────────────────────────────────
+if [ -z "${VAPID_PUBLIC_KEY:-}" ] || [ -z "${VAPID_PRIVATE_KEY:-}" ]; then
+  warn "VAPID keys not set — Web Push notifications disabled"
+  warn "Add VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY to .env to enable"
+else
+  success "VAPID keys present — Push notifications active"
+fi
+
 echo ""
 success "Update complete!"
 echo ""
-echo -e "  ${CYAN}Logs:${RESET} docker compose logs -f api"
+echo -e "  ${CYAN}Logs:${RESET}        docker compose logs -f api"
+echo -e "  ${CYAN}PWA проверка:${RESET} Chrome → DevTools → Application → Manifest"
+echo -e "  ${CYAN}SW обновление:${RESET} Клиенты получат новый SW автоматически (skipWaiting)"

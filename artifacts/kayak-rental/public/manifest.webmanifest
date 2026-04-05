@@ -4,11 +4,14 @@
   "description": "Аренда байдарок, каноэ и SUP-досок. Онлайн-бронирование.",
   "start_url": "/",
   "scope": "/",
+  "id": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "display_override": ["standalone"],
+  "background_color": "#0f172a",
   "theme_color": "#FF3C00",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "lang": "ru",
+  "dir": "ltr",
   "categories": ["sports", "shopping"],
   "icons": [
     {
@@ -29,5 +32,38 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Аренда байдарок — публичный сайт на телефоне"
+    },
+    {
+      "src": "/screenshots/desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Аренда байдарок — публичный сайт"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Каталог",
+      "short_name": "Каталог",
+      "description": "Каталог снаряжения",
+      "url": "/catalog",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Туры",
+      "short_name": "Туры",
+      "description": "Туры и маршруты",
+      "url": "/tours",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
 }

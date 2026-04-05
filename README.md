@@ -266,7 +266,19 @@ MANAGER_EMAIL=manager@your-domain.ru  # кому приходят уведомл
 
 ### PWA и Web Push (браузерные уведомления)
 
-Admin CRM доступен как PWA (Progressive Web App) и поддерживает push-уведомления для менеджеров.
+Оба сайта — публичный и CRM — работают как PWA и устанавливаются на мобильные устройства и десктоп.
+
+**Что уже встроено:**
+- `manifest.webmanifest` с иконками, скриншотами, shortcuts
+- Service Worker с офлайн-fallback (`offline.html`) и кэшем ассетов
+- Автоматическое обновление SW раз в час
+- CRM: кнопка ⬇ установки и кнопка 🔔 push-подписки в шапке
+- Push-уведомления: новые заказы, брони, сообщения чата, заявки
+
+**Требования для работы PWA:**
+- HTTPS (обязательно — `beforeinstallprompt` и PushManager работают только по HTTPS)
+- Для iOS: Safari → «Поделиться» → «На экран Домой»
+- Для Android/Desktop Chrome: автоматический prompt после нескольких визитов
 
 **Генерация VAPID-ключей** (один раз, перед деплоем):
 
@@ -285,9 +297,12 @@ VAPID_PRIVATE_KEY=<приватный ключ>
 VAPID_SUBJECT=mailto:admin@your-domain.ru
 ```
 
-После деплоя менеджеры могут включить push в CRM → кнопка 🔔 в шапке. Push-уведомления приходят при: новых заказах, бронях туров, сообщениях в чате, новых заявках.
-
 **Важно:** не меняйте VAPID-ключи после первой генерации — все браузерные подписки перестанут работать.
+
+**Проверка PWA после деплоя:**
+- Chrome → F12 → Application → Manifest → «Installable» без ошибок
+- Chrome → F12 → Application → Service Workers → «Activated and running»
+- `curl -I https://домен/manifest.webmanifest` → `Content-Type: application/manifest+json`
 
 ### SEO-эндпоинты
 

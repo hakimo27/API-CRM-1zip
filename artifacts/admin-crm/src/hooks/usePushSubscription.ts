@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { api } from '@/lib/api';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -12,15 +12,52 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-export type PushStatus = 'idle' | 'requesting' | 'subscribed' | 'denied' | 'unsupported' | 'error';
+export type PushStatus = 'idle' | 'checking' | 'requesting' | 'subscribed' | 'denied' | 'unsupported' | 'error';
 
 export function usePushSubscription() {
   const [status, setStatus] = useState<PushStatus>(() => {
     if (typeof window === 'undefined') return 'unsupported';
-    if (!('Notification' in window) || !('serviceWorker' in navigator)) return 'unsupported';
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+      return 'unsupported';
+    }
     if (Notification.permission === 'denied') return 'denied';
-    return 'idle';
+    return 'checking';
   });
+
+  // On mount: check if already subscribed (persists across page reloads)
+  useEffect(() => {
+    if (status !== 'checking') return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+          if (!cancelled) setStatus('unsupported');
+          return;
+        }
+        if (Notification.permission === 'denied') {
+          if (!cancelled) setStatus('denied');
+          return;
+        }
+
+        const registration = await navigator.serviceWorker.ready;
+        const existing = await registration.pushManager.getSubscription();
+
+        if (!cancelled) {
+          if (existing && Notification.permission === 'granted') {
+            setStatus('subscribed');
+          } else {
+            setStatus('idle');
+          }
+        }
+      } catch {
+        if (!cancelled) setStatus('idle');
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [status]);
 
   const subscribe = useCallback(async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {

@@ -225,7 +225,31 @@ Mail.ru — использовать пароль для внешних прил
 
 ## PWA и Push-уведомления
 
-Admin CRM поддерживает установку как PWA и получение push-уведомлений в браузере.
+Оба сайта — публичный и CRM — встроены как PWA (Progressive Web App).  
+**Требование:** HTTPS. Без SSL install-prompt и push-уведомления не работают.
+
+### Что входит в PWA
+
+| Файл | Публичный сайт | CRM |
+|------|---------------|-----|
+| `manifest.webmanifest` | `/manifest.webmanifest` | `/crm/manifest.webmanifest` |
+| Service Worker | `/sw.js` (scope `/`) | `/crm/sw.js` (scope `/crm/`) |
+| Офлайн-страница | `/offline.html` | `/crm/offline.html` |
+| Иконки | `/icons/icon-{192,512}.png` | `/crm/icons/icon-{192,512}.png` |
+| Скриншоты | `/screenshots/{mobile,desktop}.png` | `/crm/screenshots/{mobile,desktop}.png` |
+
+### Как браузер предлагает установку
+
+1. Сайт открыт по HTTPS  
+2. Manifest загружен с корректным MIME-типом (`application/manifest+json`)  
+3. Service Worker зарегистрирован и обрабатывает `fetch`  
+4. Иконки 192×192 и 512×512 доступны  
+
+→ Chrome показывает mini-infobar «Добавить на главный экран».  
+→ На Android — полный диалог установки (со скриншотами, добавленными в manifest).  
+→ На iOS — установка через Safari → «Поделиться» → «На экран Домой».
+
+**Кнопка установки в CRM:** кнопка ⬇ в шапке появляется автоматически, когда браузер сигнализирует о доступности install.
 
 ### Генерация VAPID-ключей (один раз!)
 
@@ -249,9 +273,31 @@ VAPID_SUBJECT=mailto:admin@ваш-домен.ru
 ### Подключение push-уведомлений в CRM
 
 1. Открыть CRM на `https://ваш-домен.ru/crm`
-2. Нажать иконку 🔔 в шапке
+2. Нажать иконку 🔔 в шапке (зелёная — уже подключено, серая — нажать для подключения)
 3. Разрешить уведомления в браузере
-4. Менеджеры будут получать push при новых заказах, чатах и бронях
+4. Менеджеры будут получать push при: новых заказах, бронях, сообщениях чата, новых заявках
+
+### Проверка PWA после деплоя
+
+```bash
+# 1. Manifest доступен
+curl -I https://ваш-домен.ru/manifest.webmanifest
+# Ожидаемо: Content-Type: application/manifest+json
+
+# 2. Service Worker доступен
+curl -I https://ваш-домен.ru/sw.js
+# Ожидаемо: Cache-Control: no-cache
+
+# 3. CRM manifest
+curl -I https://ваш-домен.ru/crm/manifest.webmanifest
+
+# 4. VAPID endpoint
+curl https://ваш-домен.ru/api/notifications/push/vapid-key
+# Ожидаемо: {"publicKey":"BP01..."}
+```
+
+В Chrome DevTools: **Application → Manifest** — должно быть «Installable» без ошибок.  
+В Chrome DevTools: **Application → Service Workers** — должен быть «Activated and running».
 
 ### SEO-эндпоинты
 
