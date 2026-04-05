@@ -4,6 +4,7 @@ import { Store, Search, Plus, Pencil, Trash2, X, ToggleLeft, ToggleRight } from 
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import ImageUpload from '@/components/ImageUpload';
+import SpecEditor, { type SpecRow } from '@/components/SpecEditor';
 
 const inputCls = "w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm";
 
@@ -11,7 +12,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-xl my-8">
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl my-8">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">{title}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
@@ -40,7 +41,10 @@ const emptyForm = {
   description: '', shortDescription: '', active: true, featured: false,
   isUsed: false, condition: 'new', manufactureYear: '', inventoryNo: '',
   images: [] as string[],
+  specs: [] as SpecRow[],
 };
+
+type Tab = 'basic' | 'specs' | 'photos';
 
 export default function SaleProductsPage() {
   const { toast } = useToast();
@@ -50,29 +54,47 @@ export default function SaleProductsPage() {
   const [editing, setEditing] = useState<any>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [form, setForm] = useState<any>(emptyForm);
-  const [tab, setTab] = useState<'basic' | 'photos'>('basic');
+  const [tab, setTab] = useState<Tab>('basic');
 
   const { data: products = [], isLoading } = useQuery<any[]>({
     queryKey: ['sale-products-admin'],
     queryFn: () => api.get('/sales/products/admin'),
   });
 
+  const buildPayload = (data: any) => ({
+    ...data,
+    stockQuantity: data.stock,
+    stock: undefined,
+    manufactureYear: data.manufactureYear ? Number(data.manufactureYear) : null,
+    specifications: data.specs.length > 0
+      ? data.specs.map((s: SpecRow, i: number) => ({ label: s.label, value: s.value, unit: s.unit, sortOrder: i }))
+      : [],
+    specs: undefined,
+  });
+
   const createMut = useMutation({
-    mutationFn: (data: any) => api.post('/sales/products', {
-      ...data, stockQuantity: data.stock, stock: undefined,
-      manufactureYear: data.manufactureYear ? Number(data.manufactureYear) : null,
-    }),
+    mutationFn: (data: any) => api.post('/sales/products', buildPayload(data)),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['sale-products-admin'] }); toast({ title: 'Товар создан' }); setCreating(false); setForm(emptyForm); setTab('basic'); },
     onError: (e: any) => toast({ title: 'Ошибка', description: e.message, variant: 'destructive' }),
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: any) => api.patch(`/sales/products/${id}`, {
-      ...data, stockQuantity: data.stock, stock: undefined,
-      manufactureYear: data.manufactureYear ? Number(data.manufactureYear) : null,
-    }),
+    mutationFn: ({ id, data }: any) => api.patch(`/sales/products/${id}`, buildPayload(data)),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['sale-products-admin'] }); toast({ title: 'Сохранено' }); setEditing(null); setTab('basic'); },
     onError: (e: any) => toast({ title: 'Ошибка', description: e.message, variant: 'destructive' }),
+  });
+
+  // Toggle active without rebuilding specs
+  const toggleActive = (p: any) => updateMut.mutate({
+    id: p.id,
+    data: {
+      ...p,
+      stock: p.stockQuantity ?? p.stock ?? 0,
+      active: !p.active,
+      specs: Array.isArray(p.specifications)
+        ? p.specifications.map((s: any, i: number) => ({ label: s.label || '', value: s.value || '', unit: s.unit || '', sortOrder: i }))
+        : [],
+    },
   });
 
   const deleteMut = useMutation({
@@ -87,15 +109,23 @@ export default function SaleProductsPage() {
   });
 
   const openEdit = (p: any) => {
+    const rawSpecs = Array.isArray(p.specifications) ? p.specifications : [];
     setForm({
       name: p.name, slug: p.slug, sku: p.sku || '', price: p.price || '', stock: p.stockQuantity ?? p.stock ?? 0,
       description: p.description || '', shortDescription: p.shortDescription || '', active: p.active, featured: p.featured,
       isUsed: p.isUsed || false, condition: p.condition || 'new',
       manufactureYear: p.manufactureYear || '', inventoryNo: p.inventoryNo || '',
       images: Array.isArray(p.images) ? p.images : [],
+      specs: rawSpecs.map((s: any, i: number) => ({ label: s.label || '', value: s.value || '', unit: s.unit || '', sortOrder: i })),
     });
     setEditing(p);
     setTab('basic');
+  };
+
+  const tabLabel: Record<Tab, string> = {
+    basic: 'Основное',
+    specs: `Характеристики${form.specs.length ? ` (${form.specs.length})` : ''}`,
+    photos: `Фото${form.images.length ? ` (${form.images.length})` : ''}`,
   };
 
   return (
@@ -144,7 +174,12 @@ export default function SaleProductsPage() {
                         )}
                         <div>
                           <div className="font-medium text-sm text-gray-900">{p.name}</div>
-                          {p.isUsed && <span className="text-xs text-orange-600 font-medium">Б/у</span>}
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {p.isUsed && <span className="text-xs text-orange-600 font-medium">Б/у</span>}
+                            {Array.isArray(p.specifications) && p.specifications.length > 0 && (
+                              <span className="text-xs text-gray-400">{p.specifications.length} характ.</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -152,7 +187,7 @@ export default function SaleProductsPage() {
                     <td className="px-6 py-4 text-sm font-medium">{p.price ? `${Number(p.price).toLocaleString('ru-RU')} ₽` : '—'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{p.stockQuantity ?? p.stock ?? '—'}</td>
                     <td className="px-6 py-4">
-                      <button onClick={() => updateMut.mutate({ id: p.id, data: { active: !p.active } })}
+                      <button onClick={() => toggleActive(p)}
                         className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${p.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
                         {p.active ? <ToggleRight className="w-3.5 h-3.5" /> : <ToggleLeft className="w-3.5 h-3.5" />}
                         {p.active ? 'Активен' : 'Скрыт'}
@@ -175,10 +210,10 @@ export default function SaleProductsPage() {
       {(creating || editing) && (
         <Modal title={creating ? 'Новый товар' : 'Редактировать товар'} onClose={() => { setCreating(false); setEditing(null); }}>
           <div className="flex border-b border-gray-100">
-            {(['basic', 'photos'] as const).map(t => (
+            {(['basic', 'specs', 'photos'] as Tab[]).map(t => (
               <button key={t} onClick={() => setTab(t)}
                 className={`px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                {t === 'basic' ? 'Основное' : `Фото (${form.images.length})`}
+                {tabLabel[t]}
               </button>
             ))}
           </div>
@@ -242,6 +277,26 @@ export default function SaleProductsPage() {
                   </label>
                 </div>
               </>
+            )}
+
+            {tab === 'specs' && (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-500">Добавьте технические характеристики товара — они будут отображаться на странице товара.</p>
+                <SpecEditor specs={form.specs} onChange={specs => setForm((f: any) => ({ ...f, specs }))} />
+                {form.specs.length > 0 && (
+                  <div className="mt-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Предпросмотр</p>
+                    <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
+                      {form.specs.filter((s: SpecRow) => s.label && s.value).map((s: SpecRow, i: number) => (
+                        <div key={i} className={`flex items-center justify-between px-3 py-2 text-sm ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${i < form.specs.filter((x: SpecRow) => x.label && x.value).length - 1 ? 'border-b border-gray-100' : ''}`}>
+                          <span className="text-gray-500">{s.label}</span>
+                          <span className="font-semibold text-gray-900">{s.value}{s.unit ? <span className="font-normal text-gray-400 ml-1">{s.unit}</span> : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {tab === 'photos' && (

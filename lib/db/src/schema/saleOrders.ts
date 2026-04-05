@@ -26,7 +26,7 @@ export const saleProductsTable = pgTable("sale_products", {
   oldPrice: numeric("old_price", { precision: 10, scale: 2 }),
   description: text("description"),
   shortDescription: text("short_description"),
-  specifications: jsonb("specifications").$type<Record<string, string>>().default({}),
+  specifications: jsonb("specifications").$type<Array<{ label: string; value: string; unit: string; sortOrder: number }>>().default([]),
   images: jsonb("images").$type<string[]>().default([]),
   stockQuantity: integer("stock_quantity").notNull().default(0),
   stockStatus: text("stock_status").notNull().default("in_stock"),

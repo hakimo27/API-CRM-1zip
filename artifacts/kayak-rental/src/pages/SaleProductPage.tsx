@@ -25,7 +25,7 @@ interface SaleProduct {
   isUsed: boolean;
   condition: string | null;
   manufactureYear: number | null;
-  specifications: Record<string, string>;
+  specifications: Array<{ label: string; value: string; unit: string; sortOrder: number }> | Record<string, string> | null;
   metaTitle: string | null;
   metaDescription: string | null;
 }
@@ -306,19 +306,44 @@ export default function SaleProductPage() {
           </div>
         )}
 
-        {product.specifications && Object.keys(product.specifications).length > 0 && (
-          <div>
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Характеристики</h2>
-            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-              {Object.entries(product.specifications).map(([key, value], i) => (
-                <div key={key} className={`flex justify-between px-5 py-3 text-sm ${i % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}>
-                  <span className="text-gray-500 font-medium">{key}</span>
-                  <span className="text-gray-900 font-semibold">{value}</span>
+        {(() => {
+          const specs = product.specifications;
+          if (!specs) return null;
+          // New array format
+          if (Array.isArray(specs) && specs.length > 0) {
+            const sorted = [...specs].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+            return (
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Характеристики</h2>
+                <div className="rounded-xl border border-gray-200 overflow-hidden">
+                  {sorted.map((s, i) => (
+                    <div key={i} className={`flex items-center justify-between px-5 py-3 text-sm ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${i < sorted.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                      <span className="text-gray-500">{s.label}</span>
+                      <span className="font-semibold text-gray-900">{s.value}{s.unit ? <span className="font-normal text-gray-400 ml-1">{s.unit}</span> : ''}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </div>
+            );
+          }
+          // Legacy object format
+          if (!Array.isArray(specs) && Object.keys(specs).length > 0) {
+            return (
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Характеристики</h2>
+                <div className="rounded-xl border border-gray-200 overflow-hidden">
+                  {Object.entries(specs).map(([key, value], i, arr) => (
+                    <div key={key} className={`flex justify-between px-5 py-3 text-sm ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                      <span className="text-gray-500">{key}</span>
+                      <span className="text-gray-900 font-semibold">{value as string}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
       </div>
 
       {/* Bottom upsell */}
