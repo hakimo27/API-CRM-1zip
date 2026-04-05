@@ -1,7 +1,7 @@
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { ArrowRight, Shield, Clock, MapPin, Star, ChevronRight, Anchor, Waves, Users, Package, Wind, Sailboat, Mountain } from 'lucide-react';
+import { ArrowRight, Shield, Clock, MapPin, Star, ChevronRight, Anchor, Waves, Users, Mountain } from 'lucide-react';
 
 interface Product {
   id: number; name: string; slug: string; categoryName: string;
@@ -15,11 +15,6 @@ interface Category {
   id: number; name: string; slug: string; productCount: number;
 }
 
-const CATEGORY_ICON_MAP: Record<string, React.ElementType> = {
-  baydarka: Waves, kanoe: Sailboat, sup: Wind,
-  snarjazhenie: Package, recom: Star,
-  kayaks: Waves, canoes: Sailboat, rafts: Anchor, equipment: Package,
-};
 
 function ProductCard({ product }: { product: Product }) {
   const minPrice = product.tariffs?.length
@@ -212,19 +207,13 @@ export default function HomePage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-8">Категории снаряжения</h2>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {categories.map(cat => {
-                const CatIcon = CATEGORY_ICON_MAP[cat.slug] || Package;
-                return (
-                  <Link key={cat.id} href={`/catalog?category=${cat.slug}`}
-                    className="flex flex-col items-center gap-3 p-6 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:-translate-y-1 border border-gray-100 group">
-                    <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                      <CatIcon className="w-6 h-6 text-blue-600" />
-                    </div>
-                    <span className="font-medium text-gray-900 text-center group-hover:text-blue-700 transition-colors">{cat.name}</span>
-                    <span className="text-xs text-gray-400">{cat.productCount ?? 0} товаров</span>
-                  </Link>
-                );
-              })}
+              {categories.map(cat => (
+                <Link key={cat.id} href={`/catalog?category=${cat.slug}`}
+                  className="flex flex-col items-center justify-center gap-2 p-6 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:-translate-y-1 border border-gray-100 group text-center">
+                  <span className="font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">{cat.name}</span>
+                  <span className="text-xs text-gray-400">{cat.productCount ?? 0} товаров</span>
+                </Link>
+              ))}
             </div>
           </div>
         </section>
