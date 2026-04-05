@@ -93,12 +93,19 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const copyright    = str(settings['general.copyright'], `Байдабаза ${new Date().getFullYear()}`);
   const logoUrl      = mediaUrl(str(settings['branding.logo_url']));
   const logoLightUrl = mediaUrl(str(settings['branding.logo_light_url']));
-  const chatEnabled      = bool(settings['chat.enabled'], true);
-  const chatGreeting     = str(settings['chat.greeting'] as string, 'Здравствуйте! Чем можем помочь?');
-  const chatPlaceholder  = str(settings['chat.placeholder'] as string, 'Напишите нам...');
-  const chatCollectName  = bool(settings['chat.collect_name'], false);
-  const chatCollectPhone = bool(settings['chat.collect_phone'], false);
-  const chatCollectEmail = bool(settings['chat.collect_email'], false);
+  const chatEnabled          = bool(settings['chat.enabled'], true);
+  const chatGreeting         = str(settings['chat.greeting'] as string, 'Здравствуйте! Чем можем помочь?');
+  const chatPlaceholder      = str(settings['chat.placeholder'] as string, 'Напишите нам...');
+  const chatCollectName      = bool(settings['chat.collect_name'], false);
+  const chatCollectPhone     = bool(settings['chat.collect_phone'], false);
+  const chatCollectEmail     = bool(settings['chat.collect_email'], false);
+  const chatOfflineFormEnabled = bool(settings['chat.offline_form_enabled'], false);
+  const chatOfflineMessageText = str(settings['chat.offline_message_text'] as string, 'Сейчас мы вне рабочего времени. Оставьте контакты — мы свяжемся с вами в рабочие часы.');
+  const chatRequireName      = bool(settings['chat.offline_form_require_name'], false);
+  const chatRequirePhone     = bool(settings['chat.offline_form_require_phone'], false);
+  const chatRequireEmail     = bool(settings['chat.offline_form_require_email'], false);
+  const chatWorkingHours     = settings['chat.working_hours'] as string | undefined;
+  const chatTimezone         = str(settings['chat.working_hours_timezone'] as string, 'Europe/Moscow');
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -306,6 +313,13 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           collectName={chatCollectName}
           collectPhone={chatCollectPhone}
           collectEmail={chatCollectEmail}
+          offlineFormEnabled={chatOfflineFormEnabled}
+          offlineMessageText={chatOfflineMessageText}
+          requireName={chatRequireName}
+          requirePhone={chatRequirePhone}
+          requireEmail={chatRequireEmail}
+          workingHoursJson={chatWorkingHours}
+          timezone={chatTimezone}
         />
       )}
     </div>

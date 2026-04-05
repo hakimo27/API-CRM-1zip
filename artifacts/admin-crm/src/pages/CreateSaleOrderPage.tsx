@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useLocation } from 'wouter';
@@ -45,9 +45,10 @@ export default function CreateSaleOrderPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [customerEmail, setCustomerEmail] = useState('');
+  const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
+  const [customerName, setCustomerName] = useState(() => urlParams.get('customerName') || '');
+  const [customerPhone, setCustomerPhone] = useState(() => urlParams.get('customerPhone') || '');
+  const [customerEmail, setCustomerEmail] = useState(() => urlParams.get('customerEmail') || '');
   const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery'>('pickup');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [managerComment, setManagerComment] = useState('');
@@ -73,7 +74,8 @@ export default function CreateSaleOrderPage() {
 
   const filteredCustomers = customers.filter((c: any) =>
     (c.name || c.fullName || '')?.toLowerCase().includes(customerSearch.toLowerCase()) ||
-    c.phone?.includes(customerSearch)
+    (c.phone || '').includes(customerSearch) ||
+    (c.email || '').toLowerCase().includes(customerSearch.toLowerCase())
   );
 
   const addProduct = (product: any) => {

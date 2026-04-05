@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageSquare, X, Send, ChevronDown, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { MessageSquare, X, Send, ChevronDown, Loader2, Clock, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PhoneInput } from "./PhoneInput";
 
@@ -12,6 +12,12 @@ interface ChatMessage {
   createdAt: string;
 }
 
+interface DaySchedule {
+  enabled: boolean;
+  start: string;
+  end: string;
+}
+
 interface ChatWidgetProps {
   enabled?: boolean;
   greeting?: string;
@@ -19,6 +25,13 @@ interface ChatWidgetProps {
   collectName?: boolean;
   collectPhone?: boolean;
   collectEmail?: boolean;
+  offlineFormEnabled?: boolean;
+  offlineMessageText?: string;
+  requireName?: boolean;
+  requirePhone?: boolean;
+  requireEmail?: boolean;
+  workingHoursJson?: string;
+  timezone?: string;
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
@@ -72,6 +85,50 @@ async function validateSession(id: number): Promise<boolean> {
   }
 }
 
+const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+
+const DEFAULT_WORKING_HOURS: Record<string, DaySchedule> = {
+  mon: { enabled: true, start: "10:00", end: "19:00" },
+  tue: { enabled: true, start: "10:00", end: "19:00" },
+  wed: { enabled: true, start: "10:00", end: "19:00" },
+  thu: { enabled: true, start: "10:00", end: "19:00" },
+  fri: { enabled: true, start: "10:00", end: "19:00" },
+  sat: { enabled: true, start: "11:00", end: "17:00" },
+  sun: { enabled: false, start: "00:00", end: "00:00" },
+};
+
+function isWithinWorkingHours(
+  workingHoursJson: string | undefined,
+  timezone: string = "Europe/Moscow"
+): boolean {
+  if (!workingHoursJson) return true;
+
+  let schedule: Record<string, DaySchedule>;
+  try {
+    schedule = { ...DEFAULT_WORKING_HOURS, ...JSON.parse(workingHoursJson) };
+  } catch {
+    return true;
+  }
+
+  try {
+    const now = new Date();
+    const tzDate = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
+    const dayKey = DAY_KEYS[tzDate.getDay()];
+    const day = schedule[dayKey];
+    if (!day || !day.enabled) return false;
+
+    const [startH, startM] = day.start.split(":").map(Number);
+    const [endH, endM] = day.end.split(":").map(Number);
+    const nowMins = tzDate.getHours() * 60 + tzDate.getMinutes();
+    const startMins = startH * 60 + startM;
+    const endMins = endH * 60 + endM;
+
+    return nowMins >= startMins && nowMins < endMins;
+  } catch {
+    return true;
+  }
+}
+
 const QUICK_REPLIES = ["Аренда байдарки", "Цены и тарифы", "Доставка", "Туры"];
 
 export default function ChatWidget({
@@ -81,25 +138,43 @@ export default function ChatWidget({
   collectName = false,
   collectPhone = false,
   collectEmail = false,
+  offlineFormEnabled = false,
+  offlineMessageText = "Сейчас мы вне рабочего времени. Оставьте контакты — мы свяжемся с вами в рабочие часы.",
+  requireName = false,
+  requirePhone = false,
+  requireEmail = false,
+  workingHoursJson,
+  timezone = "Europe/Moscow",
 }: ChatWidgetProps) {
-  const needsPreForm = collectName || collectPhone || collectEmail;
+  const isOnline = useMemo(
+    () => isWithinWorkingHours(workingHoursJson, timezone),
+    [workingHoursJson, timezone]
+  );
 
-  // Determine initial phase: if there's an existing session, skip pre-chat form
+  const needsPreForm = collectName || collectPhone || collectEmail;
   const storedId = getStoredSessionId();
   const hasExistingSession = storedId !== null;
 
   const [open, setOpen] = useState(false);
-  // CRITICAL: phase depends on both needsPreForm AND whether an existing session exists
-  // If existing session → "chat" always (no need to re-collect info)
-  // If no session AND needsPreForm → "pre-chat"
-  // If no session AND !needsPreForm → "chat" (session created on open)
-  const [phase, setPhase] = useState<"pre-chat" | "chat">(
-    needsPreForm && !hasExistingSession ? "pre-chat" : "chat"
-  );
+
+  const initialPhase = (): "pre-chat" | "chat" | "offline" | "offline-success" => {
+    if (!isOnline && offlineFormEnabled) return "offline";
+    if (needsPreForm && !hasExistingSession) return "pre-chat";
+    return "chat";
+  };
+
+  const [phase, setPhase] = useState<"pre-chat" | "chat" | "offline" | "offline-success">(initialPhase);
   const [leadName, setLeadName] = useState("");
   const [leadPhone, setLeadPhone] = useState("");
   const [leadEmail, setLeadEmail] = useState("");
   const [leadError, setLeadError] = useState("");
+
+  const [offlineName, setOfflineName] = useState("");
+  const [offlinePhone, setOfflinePhone] = useState("");
+  const [offlineEmail, setOfflineEmail] = useState("");
+  const [offlineMsg, setOfflineMsg] = useState("");
+  const [offlineError, setOfflineError] = useState("");
+  const [offlineSubmitting, setOfflineSubmitting] = useState(false);
 
   const [sessionId, setSessionId] = useState<number | null>(storedId);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -110,22 +185,22 @@ export default function ChatWidget({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Sync phase when needsPreForm changes (handles late-loading settings)
   const initialized = useRef(false);
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
     const stored = getStoredSessionId();
     if (stored !== null) {
-      // Has existing session - always go to chat phase, regardless of needsPreForm
       setSessionId(stored);
       setPhase("chat");
+    } else if (!isOnline && offlineFormEnabled) {
+      setPhase("offline");
     } else if (needsPreForm) {
       setPhase("pre-chat");
     } else {
       setPhase("chat");
     }
-  }, [needsPreForm]);
+  }, [isOnline, offlineFormEnabled, needsPreForm]);
 
   const fetchMessages = useCallback(async (sid: number) => {
     try {
@@ -153,7 +228,6 @@ export default function ChatWidget({
   async function openChat() {
     setOpen(true);
     if (phase === "chat" && !sessionId) {
-      // No pre-form needed and no session — create one now
       setLoading(true);
       try {
         const stored = getStoredSessionId();
@@ -188,7 +262,6 @@ export default function ChatWidget({
 
     setLoading(true);
     try {
-      // Check if there's already a valid session in localStorage
       const stored = getStoredSessionId();
       if (stored) {
         const valid = await validateSession(stored);
@@ -215,6 +288,35 @@ export default function ChatWidget({
       setLeadError("Ошибка соединения. Попробуйте позже.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function submitOfflineForm(e: React.FormEvent) {
+    e.preventDefault();
+    setOfflineError("");
+    if (requireName && !offlineName.trim()) { setOfflineError("Введите имя"); return; }
+    if (requirePhone && !offlinePhone.trim()) { setOfflineError("Введите телефон"); return; }
+    if (requireEmail && !offlineEmail.trim()) { setOfflineError("Введите email"); return; }
+    if (!offlineMsg.trim()) { setOfflineError("Введите сообщение"); return; }
+
+    setOfflineSubmitting(true);
+    try {
+      await apiFetch("/chat/offline-request", {
+        method: "POST",
+        body: JSON.stringify({
+          name: offlineName || undefined,
+          phone: offlinePhone || undefined,
+          email: offlineEmail || undefined,
+          message: offlineMsg,
+          sourcePage: window.location.pathname,
+        }),
+      });
+      setPhase("offline-success");
+    } catch (e) {
+      console.error("Offline request error:", e);
+      setOfflineError("Ошибка отправки. Попробуйте позже.");
+    } finally {
+      setOfflineSubmitting(false);
     }
   }
 
@@ -252,6 +354,10 @@ export default function ChatWidget({
 
   const inputCls = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
 
+  const headerSubtitle = isOnline
+    ? "Обычно отвечаем за 15 минут"
+    : "Сейчас вне рабочего времени";
+
   return (
     <>
       {!open && (
@@ -267,15 +373,81 @@ export default function ChatWidget({
       {open && (
         <div className="fixed bottom-6 right-6 z-50 w-80 sm:w-96 flex flex-col rounded-2xl shadow-2xl overflow-hidden bg-white border border-gray-200">
           {/* Header */}
-          <div className="bg-blue-600 text-white px-4 py-3 flex items-center justify-between">
+          <div className={cn("text-white px-4 py-3 flex items-center justify-between", isOnline ? "bg-blue-600" : "bg-gray-600")}>
             <div>
               <div className="font-semibold text-sm">Чат с менеджером</div>
-              <div className="text-blue-200 text-xs">Обычно отвечаем за 15 минут</div>
+              <div className={cn("text-xs", isOnline ? "text-blue-200" : "text-gray-300")}>
+                {headerSubtitle}
+              </div>
             </div>
-            <button onClick={() => setOpen(false)} className="p-1 hover:bg-blue-700 rounded transition-colors">
+            <button onClick={() => setOpen(false)} className={cn("p-1 rounded transition-colors", isOnline ? "hover:bg-blue-700" : "hover:bg-gray-700")}>
               <ChevronDown className="w-5 h-5" />
             </button>
           </div>
+
+          {/* Offline: show form */}
+          {phase === "offline" && offlineFormEnabled && (
+            <form onSubmit={submitOfflineForm} className="p-4 space-y-3">
+              <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                <Clock className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-800">{offlineMessageText}</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Ваше имя{requireName ? " *" : ""}
+                </label>
+                <input value={offlineName} onChange={e => setOfflineName(e.target.value)}
+                  placeholder="Иван" className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Телефон{requirePhone ? " *" : ""}
+                </label>
+                <PhoneInput value={offlinePhone} onChange={setOfflinePhone} className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Email{requireEmail ? " *" : ""}
+                </label>
+                <input type="email" value={offlineEmail} onChange={e => setOfflineEmail(e.target.value)}
+                  placeholder="email@example.ru" className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Сообщение *</label>
+                <textarea value={offlineMsg} onChange={e => setOfflineMsg(e.target.value)}
+                  placeholder="Опишите ваш вопрос..." rows={3}
+                  className={inputCls + " resize-none"} />
+              </div>
+              {offlineError && <p className="text-xs text-red-600">{offlineError}</p>}
+              <button type="submit" disabled={offlineSubmitting}
+                className="w-full py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                {offlineSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                Отправить заявку
+              </button>
+            </form>
+          )}
+
+          {/* Offline: no form, just message */}
+          {phase === "offline" && !offlineFormEnabled && (
+            <div className="p-5 space-y-3">
+              <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                <Clock className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800">{offlineMessageText}</p>
+              </div>
+              <p className="text-xs text-center text-gray-400">Попробуйте написать нам позже</p>
+            </div>
+          )}
+
+          {/* Offline form success */}
+          {phase === "offline-success" && (
+            <div className="p-6 flex flex-col items-center gap-3 text-center">
+              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="w-7 h-7 text-green-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900">Заявка отправлена</h3>
+              <p className="text-sm text-gray-500">Мы получили ваше обращение и свяжемся с вами в рабочее время.</p>
+            </div>
+          )}
 
           {/* Pre-chat form */}
           {phase === "pre-chat" && (
@@ -286,44 +458,26 @@ export default function ChatWidget({
               {collectName && (
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Ваше имя</label>
-                  <input
-                    value={leadName}
-                    onChange={e => setLeadName(e.target.value)}
-                    placeholder="Иван"
-                    className={inputCls}
-                  />
+                  <input value={leadName} onChange={e => setLeadName(e.target.value)}
+                    placeholder="Иван" className={inputCls} />
                 </div>
               )}
               {collectPhone && (
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Телефон</label>
-                  <PhoneInput
-                    value={leadPhone}
-                    onChange={setLeadPhone}
-                    className={inputCls}
-                  />
+                  <PhoneInput value={leadPhone} onChange={setLeadPhone} className={inputCls} />
                 </div>
               )}
               {collectEmail && (
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={leadEmail}
-                    onChange={e => setLeadEmail(e.target.value)}
-                    placeholder="email@example.ru"
-                    className={inputCls}
-                  />
+                  <input type="email" value={leadEmail} onChange={e => setLeadEmail(e.target.value)}
+                    placeholder="email@example.ru" className={inputCls} />
                 </div>
               )}
-              {leadError && (
-                <p className="text-xs text-red-600">{leadError}</p>
-              )}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
+              {leadError && <p className="text-xs text-red-600">{leadError}</p>}
+              <button type="submit" disabled={loading}
+                className="w-full py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                 Начать диалог
               </button>
@@ -342,23 +496,18 @@ export default function ChatWidget({
 
                 {!loading && messages.length === 0 && (
                   <div className="text-center text-gray-400 text-sm py-4">
-                    {greeting || 'Начните диалог с менеджером'}
+                    {greeting || "Начните диалог с менеджером"}
                   </div>
                 )}
 
                 {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={cn("flex", msg.sender === "customer" ? "justify-end" : "justify-start")}
-                  >
-                    <div
-                      className={cn(
-                        "max-w-[80%] rounded-2xl px-3 py-2 text-sm",
-                        msg.sender === "customer"
-                          ? "bg-blue-600 text-white rounded-br-sm"
-                          : "bg-white text-gray-800 border border-gray-200 rounded-bl-sm",
-                      )}
-                    >
+                  <div key={msg.id} className={cn("flex", msg.sender === "customer" ? "justify-end" : "justify-start")}>
+                    <div className={cn(
+                      "max-w-[80%] rounded-2xl px-3 py-2 text-sm",
+                      msg.sender === "customer"
+                        ? "bg-blue-600 text-white rounded-br-sm"
+                        : "bg-white text-gray-800 border border-gray-200 rounded-bl-sm",
+                    )}>
                       {msg.content}
                     </div>
                   </div>
@@ -368,36 +517,25 @@ export default function ChatWidget({
 
               <div className="px-3 py-2 border-t border-gray-100 flex flex-wrap gap-1.5">
                 {QUICK_REPLIES.map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => send(r)}
-                    disabled={sending || loading}
-                    className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2.5 py-1 hover:bg-blue-100 transition-colors disabled:opacity-50"
-                  >
+                  <button key={r} onClick={() => send(r)} disabled={sending || loading}
+                    className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2.5 py-1 hover:bg-blue-100 transition-colors disabled:opacity-50">
                     {r}
                   </button>
                 ))}
               </div>
 
-              {sendError && (
-                <p className="px-3 text-xs text-red-600">{sendError}</p>
-              )}
+              {sendError && <p className="px-3 text-xs text-red-600">{sendError}</p>}
 
               <div className="p-3 flex gap-2 border-t border-gray-100 bg-white">
-                <input
-                  type="text"
-                  value={inputText}
+                <input type="text" value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send(inputText)}
-                  placeholder={placeholder}
-                  disabled={loading}
+                  placeholder={placeholder} disabled={loading}
                   className="flex-1 text-sm border border-gray-200 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
                 />
-                <button
-                  onClick={() => send(inputText)}
+                <button onClick={() => send(inputText)}
                   disabled={!inputText.trim() || sending || loading}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-full w-9 h-9 flex items-center justify-center shrink-0 transition-colors"
-                >
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-full w-9 h-9 flex items-center justify-center shrink-0 transition-colors">
                   {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>
               </div>

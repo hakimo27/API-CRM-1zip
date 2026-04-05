@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 // ─── FIELD TYPE ───────────────────────────────────────────────────────────────
-type FieldType = 'text' | 'number' | 'boolean' | 'password' | 'color' | 'url' | 'textarea' | 'tel' | 'image';
+type FieldType = 'text' | 'number' | 'boolean' | 'password' | 'color' | 'url' | 'textarea' | 'tel' | 'image' | 'working-hours';
 interface FieldDef {
   key: string;
   label: string;
@@ -166,21 +166,88 @@ const TABS: TabDef[] = [
     label: 'Чат-виджет',
     saveLabel: 'настройки чат-виджета',
     fields: [
-      { key: 'chat.enabled',          label: 'Включить чат-виджет',                  type: 'boolean',  section: 'Отображение', hint: 'Показывать кнопку чата на сайте' },
-      { key: 'chat.show_on_homepage', label: 'Показывать на главной странице',        type: 'boolean' },
-      { key: 'chat.show_on_product',  label: 'Показывать на страницах товаров',       type: 'boolean' },
-      { key: 'chat.show_on_sale',     label: 'Показывать на страницах продажи',       type: 'boolean' },
-      { key: 'chat.show_on_tour',     label: 'Показывать на страницах туров',         type: 'boolean' },
-      { key: 'chat.show_on_contacts', label: 'Показывать на странице контактов',      type: 'boolean' },
-      { key: 'chat.greeting',         label: 'Приветственное сообщение',             placeholder: 'Здравствуйте! Чем можем помочь?', section: 'Тексты', hint: 'Первое сообщение при открытии чата' },
-      { key: 'chat.offline_message',  label: 'Сообщение в нерабочее время',          type: 'textarea', placeholder: 'Мы сейчас не в сети. Оставьте сообщение — ответим в ближайшее время.', hint: 'Показывается когда операторы не онлайн' },
-      { key: 'chat.placeholder',      label: 'Placeholder поля ввода',               placeholder: 'Напишите нам...' },
-      { key: 'chat.collect_name',     label: 'Запросить имя перед диалогом',         type: 'boolean',  section: 'Сбор данных', hint: 'Перед началом чата просить назвать имя' },
-      { key: 'chat.collect_phone',    label: 'Запросить телефон перед диалогом',     type: 'boolean',  hint: 'Перед началом чата просить оставить номер' },
-      { key: 'chat.collect_email',    label: 'Запросить email перед диалогом',       type: 'boolean',  hint: 'Перед началом чата просить email' },
+      { key: 'chat.enabled',                    label: 'Включить чат-виджет',                       type: 'boolean',  section: 'Основное', hint: 'Показывать кнопку чата на сайте' },
+      { key: 'chat.show_on_homepage',           label: 'Показывать на главной странице',            type: 'boolean' },
+      { key: 'chat.show_on_product',            label: 'Показывать на страницах товаров',           type: 'boolean' },
+      { key: 'chat.show_on_tour',               label: 'Показывать на страницах туров',             type: 'boolean' },
+      { key: 'chat.greeting',                   label: 'Приветственное сообщение',                  placeholder: 'Здравствуйте! Чем можем помочь?', section: 'Тексты', hint: 'Первое сообщение при открытии чата' },
+      { key: 'chat.placeholder',                label: 'Placeholder поля ввода',                    placeholder: 'Напишите нам...' },
+      { key: 'chat.collect_name',               label: 'Запросить имя перед диалогом',              type: 'boolean',  section: 'Сбор данных перед чатом' },
+      { key: 'chat.collect_phone',              label: 'Запросить телефон перед диалогом',          type: 'boolean' },
+      { key: 'chat.collect_email',              label: 'Запросить email перед диалогом',            type: 'boolean' },
+      { key: 'chat.offline_form_enabled',       label: 'Показывать форму обратной связи вне рабочего времени', type: 'boolean', section: 'Нерабочее время' },
+      { key: 'chat.offline_message_text',       label: 'Текст при нерабочем времени',              type: 'textarea', placeholder: 'Сейчас мы вне рабочего времени. Оставьте контакты — свяжемся в рабочие часы.' },
+      { key: 'chat.offline_form_require_name',  label: 'Имя — обязательное поле формы',            type: 'boolean' },
+      { key: 'chat.offline_form_require_phone', label: 'Телефон — обязательное поле формы',        type: 'boolean' },
+      { key: 'chat.offline_form_require_email', label: 'Email — обязательное поле формы',          type: 'boolean' },
+      { key: 'chat.auto_create_customer',       label: 'Автоматически создавать карточку клиента',  type: 'boolean', hint: 'По данным из offline-формы' },
+      { key: 'chat.working_hours_timezone',     label: 'Часовой пояс',                             placeholder: 'Europe/Moscow', section: 'График работы', hint: 'Например: Europe/Moscow, Asia/Yekaterinburg' },
+      { key: 'chat.working_hours',              label: 'Расписание по дням',                       type: 'working-hours' },
     ],
   },
 ];
+
+// ─── WORKING HOURS EDITOR ─────────────────────────────────────────────────────
+const DAYS = [
+  { key: 'mon', label: 'Пн' },
+  { key: 'tue', label: 'Вт' },
+  { key: 'wed', label: 'Ср' },
+  { key: 'thu', label: 'Чт' },
+  { key: 'fri', label: 'Пт' },
+  { key: 'sat', label: 'Сб' },
+  { key: 'sun', label: 'Вс' },
+];
+
+const DEFAULT_HOURS: Record<string, { enabled: boolean; start: string; end: string }> = {
+  mon: { enabled: true, start: '10:00', end: '19:00' },
+  tue: { enabled: true, start: '10:00', end: '19:00' },
+  wed: { enabled: true, start: '10:00', end: '19:00' },
+  thu: { enabled: true, start: '10:00', end: '19:00' },
+  fri: { enabled: true, start: '10:00', end: '19:00' },
+  sat: { enabled: true, start: '11:00', end: '17:00' },
+  sun: { enabled: false, start: '00:00', end: '00:00' },
+};
+
+function WorkingHoursEditor({ value, onChange }: { value: unknown; onChange: (v: string) => void }) {
+  const parsed = (() => {
+    try {
+      const obj = typeof value === 'string' && value ? JSON.parse(value) : {};
+      return { ...DEFAULT_HOURS, ...obj };
+    } catch { return { ...DEFAULT_HOURS }; }
+  })();
+
+  const update = (day: string, field: 'enabled' | 'start' | 'end', val: boolean | string) => {
+    const next = { ...parsed, [day]: { ...parsed[day], [field]: val } };
+    onChange(JSON.stringify(next));
+  };
+
+  return (
+    <div className="w-full max-w-lg space-y-1.5">
+      {DAYS.map(({ key, label }) => {
+        const d = parsed[key] || DEFAULT_HOURS[key];
+        return (
+          <div key={key} className={`flex items-center gap-3 px-3 py-2 rounded-xl border ${d.enabled ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50'}`}>
+            <label className="flex items-center gap-2 cursor-pointer w-8 flex-shrink-0">
+              <input type="checkbox" checked={d.enabled} onChange={e => update(key, 'enabled', e.target.checked)} className="rounded" />
+              <span className={`text-xs font-semibold w-5 ${d.enabled ? 'text-gray-800' : 'text-gray-400'}`}>{label}</span>
+            </label>
+            {d.enabled ? (
+              <>
+                <input type="time" value={d.start} onChange={e => update(key, 'start', e.target.value)}
+                  className="flex-1 text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <span className="text-xs text-gray-400">—</span>
+                <input type="time" value={d.end} onChange={e => update(key, 'end', e.target.value)}
+                  className="flex-1 text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </>
+            ) : (
+              <span className="text-xs text-gray-400 italic">выходной</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 // ─── TOAST ────────────────────────────────────────────────────────────────────
 interface ToastState { type: 'success' | 'error'; msg: string }
@@ -328,6 +395,10 @@ function FieldInput({
 
   if (field.type === 'image') {
     return <ImageFieldInput value={strVal} onChange={v => onChange(v)} />;
+  }
+
+  if (field.type === 'working-hours') {
+    return <WorkingHoursEditor value={value} onChange={v => onChange(v)} />;
   }
 
   return (

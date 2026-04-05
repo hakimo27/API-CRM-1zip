@@ -74,6 +74,34 @@ export class CustomersService {
     return customer || null;
   }
 
+  async findByEmail(email: string) {
+    const [customer] = await this.db
+      .select()
+      .from(customersTable)
+      .where(eq(customersTable.email, email))
+      .limit(1);
+    return customer || null;
+  }
+
+  async findOrCreate(data: { name?: string; phone?: string; email?: string; notes?: string }) {
+    if (data.phone) {
+      const byPhone = await this.findByPhone(data.phone);
+      if (byPhone) return { customer: byPhone, created: false };
+    }
+    if (data.email) {
+      const byEmail = await this.findByEmail(data.email);
+      if (byEmail) return { customer: byEmail, created: false };
+    }
+    const created = await this.create({
+      name: data.name || data.email || data.phone || "Новый клиент",
+      phone: data.phone || "",
+      email: data.email,
+      notes: data.notes,
+      communicationChannel: "web",
+    });
+    return { customer: created, created: true };
+  }
+
   async create(data: typeof customersTable.$inferInsert) {
     const [created] = await this.db.insert(customersTable).values(data).returning();
     return created;

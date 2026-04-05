@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, Inject, Optional } from "@nestjs/common"
 import { BusinessNotificationsService } from "../notifications/business-notifications.service.js";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
-import { chatSessionsTable, chatMessagesTable } from "@workspace/db";
+import { chatSessionsTable, chatMessagesTable, customersTable } from "@workspace/db";
 
 type DrizzleDb = typeof import("@workspace/db").db;
 
@@ -166,6 +166,83 @@ export class ChatService {
 
     if (!updated) throw new NotFoundException("Сессия не найдена");
     return updated;
+  }
+
+  async createOfflineRequest(data: {
+    name?: string;
+    phone?: string;
+    email?: string;
+    message: string;
+    sourcePage?: string;
+  }) {
+    let customer: typeof customersTable.$inferSelect | null = null;
+
+    if (data.phone) {
+      const [found] = await this.db
+        .select()
+        .from(customersTable)
+        .where(eq(customersTable.phone, data.phone))
+        .limit(1);
+      if (found) customer = found;
+    }
+
+    if (!customer && data.email) {
+      const [found] = await this.db
+        .select()
+        .from(customersTable)
+        .where(eq(customersTable.email, data.email))
+        .limit(1);
+      if (found) customer = found;
+    }
+
+    if (!customer) {
+      const [created] = await this.db
+        .insert(customersTable)
+        .values({
+          name: data.name || data.email || data.phone || "Новый клиент",
+          phone: data.phone || "",
+          email: data.email,
+          communicationChannel: "web",
+          notes: `Лид из offline-формы. Страница: ${data.sourcePage || "неизвестно"}`,
+        })
+        .returning();
+      customer = created!;
+    }
+
+    const [session] = await this.db
+      .insert(chatSessionsTable)
+      .values({
+        channel: "web" as any,
+        status: "open" as any,
+        customerId: customer!.id,
+        customerName: customer!.name,
+        metadata: {
+          source: "offline_form",
+          page: data.sourcePage || null,
+          name: data.name,
+          phone: data.phone,
+          email: data.email,
+        },
+      })
+      .returning();
+
+    await this.db.insert(chatMessagesTable).values({
+      sessionId: session!.id,
+      content: data.message,
+      sender: "customer",
+      senderName: data.name || "Клиент",
+    });
+
+    this.businessNotifications?.notifyNewChat({
+      id: session!.id,
+      channel: session!.channel,
+      metadata: session!.metadata as Record<string, unknown> | null,
+    }).catch(() => {});
+
+    return {
+      sessionId: session!.id,
+      customerId: customer!.id,
+    };
   }
 
   async getUnreadCount() {

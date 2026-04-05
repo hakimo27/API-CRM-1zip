@@ -85,4 +85,18 @@ export class ChatController {
   markAsRead(@Param("id", ParseIntPipe) id: number) {
     return this.chatService.markAsRead(id);
   }
+
+  @Public()
+  @Post("offline-request")
+  createOfflineRequest(
+    @Body() body: {
+      name?: string;
+      phone?: string;
+      email?: string;
+      message: string;
+      sourcePage?: string;
+    }
+  ) {
+    return this.chatService.createOfflineRequest(body);
+  }
 }

@@ -5,7 +5,7 @@ import { Link, useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import {
   User, Phone, Mail, MessageSquare, ArrowLeft, ShoppingBag, Calendar,
-  Edit2, Check, X, MapPin, Clock, TrendingUp, Package, AlertCircle,
+  Edit2, Check, X, MapPin, Clock, TrendingUp, Package, AlertCircle, Store,
 } from 'lucide-react';
 import { PhoneInput } from '@/components/PhoneInput';
 
@@ -142,11 +142,16 @@ export default function CustomerDetailPage({ id }: { id: string }) {
           <h1 className="text-xl font-bold text-gray-900">{customer.name}</h1>
           <p className="text-sm text-gray-500">Клиент #{customer.id} · Создан {fmt(customer.createdAt)}</p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          <Link href={`/orders/new?customerId=${customer.id}&customerName=${encodeURIComponent(customer.name)}&customerPhone=${encodeURIComponent(customer.phone || '')}`}
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
+          <Link href={`/orders/new?customerId=${customer.id}&customerName=${encodeURIComponent(customer.name)}&customerPhone=${encodeURIComponent(customer.phone || '')}&customerEmail=${encodeURIComponent(customer.email || '')}`}
             className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-xl hover:bg-blue-700 transition-colors">
             <ShoppingBag className="w-4 h-4" />
-            Новый заказ
+            Аренда
+          </Link>
+          <Link href={`/sale-orders/new?customerId=${customer.id}&customerName=${encodeURIComponent(customer.name)}&customerPhone=${encodeURIComponent(customer.phone || '')}&customerEmail=${encodeURIComponent(customer.email || '')}`}
+            className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white text-sm rounded-xl hover:bg-green-700 transition-colors">
+            <Store className="w-4 h-4" />
+            Продажа
           </Link>
           <Link href={`/chat?customerId=${customer.id}`}
             className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 text-gray-700 text-sm rounded-xl hover:bg-gray-50 transition-colors">
