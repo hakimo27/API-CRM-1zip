@@ -1,7 +1,7 @@
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { ArrowRight, Shield, Clock, MapPin, Star, ChevronRight, Anchor, Waves, Users, Calendar } from 'lucide-react';
+import { ArrowRight, Shield, Clock, MapPin, Star, ChevronRight, Anchor, Waves, Users, Package, Wind, Sailboat, Mountain } from 'lucide-react';
 
 interface Product {
   id: number; name: string; slug: string; categoryName: string;
@@ -15,8 +15,10 @@ interface Category {
   id: number; name: string; slug: string; productCount: number;
 }
 
-const CATEGORY_ICONS: Record<string, string> = {
-  kayaks: '🛶', canoes: '⛵', sup: '🏄', rafts: '🚣', equipment: '🎒',
+const CATEGORY_ICON_MAP: Record<string, React.ElementType> = {
+  baydarka: Waves, kanoe: Sailboat, sup: Wind,
+  snarjazhenie: Package, recom: Star,
+  kayaks: Waves, canoes: Sailboat, rafts: Anchor, equipment: Package,
 };
 
 function ProductCard({ product }: { product: Product }) {
@@ -26,13 +28,17 @@ function ProductCard({ product }: { product: Product }) {
 
   return (
     <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow border border-gray-100 overflow-hidden group">
-      <div className="relative h-48 bg-gradient-to-br from-blue-100 to-cyan-50 flex items-center justify-center">
+      <div className="relative h-48 bg-gradient-to-br from-blue-100 to-cyan-50 flex items-center justify-center overflow-hidden">
+        {product.mainImage ? (
+          <img src={product.mainImage} alt={product.name} className="w-full h-full object-cover" />
+        ) : (
+          <Waves className="w-16 h-16 text-blue-300" />
+        )}
         {product.badge && (
           <span className="absolute top-3 left-3 px-2 py-1 bg-blue-600 text-white text-xs font-bold rounded-full">
             {product.badge}
           </span>
         )}
-        <span className="text-7xl opacity-60">🛶</span>
       </div>
       <div className="p-4">
         <div className="text-xs text-blue-600 font-medium mb-1">{product.categoryName}</div>
@@ -65,13 +71,17 @@ function ProductCard({ product }: { product: Product }) {
 function TourCard({ tour }: { tour: any }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow border border-gray-100 overflow-hidden group">
-      <div className="h-44 bg-gradient-to-br from-teal-100 to-green-50 flex items-center justify-center relative">
+      <div className="h-44 bg-gradient-to-br from-teal-100 to-green-50 flex items-center justify-center relative overflow-hidden">
+        {tour.mainImage ? (
+          <img src={tour.mainImage} alt={tour.title || tour.name} className="w-full h-full object-cover" />
+        ) : (
+          <Mountain className="w-14 h-14 text-teal-300" />
+        )}
         {tour.difficulty && (
           <span className="absolute top-3 right-3 px-2 py-1 bg-white/80 backdrop-blur text-xs font-medium rounded-full text-gray-700">
             {tour.difficulty === 'easy' ? 'Лёгкий' : tour.difficulty === 'medium' ? 'Средний' : tour.difficulty === 'hard' ? 'Сложный' : tour.difficulty}
           </span>
         )}
-        <span className="text-6xl opacity-60">🚣</span>
       </div>
       <div className="p-4">
         <h3 className="font-semibold text-gray-900 mb-1.5 group-hover:text-blue-700 transition-colors line-clamp-1">
@@ -202,14 +212,19 @@ export default function HomePage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-8">Категории снаряжения</h2>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {categories.map(cat => (
-                <Link key={cat.id} href={`/catalog?category=${cat.slug}`}
-                  className="flex flex-col items-center gap-3 p-6 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:-translate-y-1 border border-gray-100 group">
-                  <span className="text-4xl">{CATEGORY_ICONS[cat.slug] || '📦'}</span>
-                  <span className="font-medium text-gray-900 text-center group-hover:text-blue-700 transition-colors">{cat.name}</span>
-                  <span className="text-xs text-gray-400">{cat.productCount} товаров</span>
-                </Link>
-              ))}
+              {categories.map(cat => {
+                const CatIcon = CATEGORY_ICON_MAP[cat.slug] || Package;
+                return (
+                  <Link key={cat.id} href={`/catalog?category=${cat.slug}`}
+                    className="flex flex-col items-center gap-3 p-6 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:-translate-y-1 border border-gray-100 group">
+                    <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                      <CatIcon className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <span className="font-medium text-gray-900 text-center group-hover:text-blue-700 transition-colors">{cat.name}</span>
+                    <span className="text-xs text-gray-400">{cat.productCount ?? 0} товаров</span>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         </section>

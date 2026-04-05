@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, Inject } from "@nestjs/common";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, count } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
-import { categoriesTable } from "@workspace/db";
+import { categoriesTable, productsTable } from "@workspace/db";
 
 type DrizzleDb = typeof import("@workspace/db").db;
 
@@ -10,7 +10,22 @@ export class CategoriesService {
   constructor(@Inject(DB_TOKEN) private db: DrizzleDb) {}
 
   async findAll() {
-    return this.db.select().from(categoriesTable).where(eq(categoriesTable.active, true)).orderBy(asc(categoriesTable.sortOrder));
+    const cats = await this.db
+      .select()
+      .from(categoriesTable)
+      .where(eq(categoriesTable.active, true))
+      .orderBy(asc(categoriesTable.sortOrder));
+
+    const counts = await this.db
+      .select({ categoryId: productsTable.categoryId, cnt: count() })
+      .from(productsTable)
+      .where(eq(productsTable.active, true))
+      .groupBy(productsTable.categoryId);
+
+    const countMap: Record<number, number> = {};
+    for (const c of counts) countMap[c.categoryId] = Number(c.cnt);
+
+    return cats.map(cat => ({ ...cat, productCount: countMap[cat.id] ?? 0 }));
   }
 
   async findBySlug(slug: string) {
