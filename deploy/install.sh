@@ -36,7 +36,7 @@ if [ ! -f ".env" ]; then
   if [ -f ".env.example" ]; then
     warn ".env not found. Copying .env.example → .env"
     cp .env.example .env
-    warn "Please edit .env with your real values, then re-run this script."
+    warn "Edit .env with your real values, then re-run: sh deploy/install.sh"
     exit 1
   else
     error ".env file not found. Create it from .env.example"
@@ -50,7 +50,7 @@ success ".env loaded"
 REQUIRED_VARS=(POSTGRES_PASSWORD JWT_SECRET JWT_REFRESH_SECRET SESSION_SECRET)
 for var in "${REQUIRED_VARS[@]}"; do
   if [ -z "${!var:-}" ] || [[ "${!var}" == *"CHANGE_ME"* ]]; then
-    error "Required variable $var is not set or still has placeholder value. Edit .env"
+    error "Variable $var is not set or still has placeholder value. Edit .env"
   fi
 done
 success "Required environment variables OK"
@@ -61,7 +61,7 @@ mkdir -p backups docker/ssl
 success "Directories ready"
 
 # ── 4. Build images ──────────────────────────────────────────────────────────
-info "Building Docker images (this takes a few minutes on first run)..."
+info "Building Docker images (first run takes a few minutes)..."
 docker compose build --parallel
 success "Images built"
 
@@ -72,37 +72,34 @@ success "postgres and redis started"
 
 # ── 6. Wait for PostgreSQL ───────────────────────────────────────────────────
 info "Waiting for PostgreSQL to be ready..."
-ATTEMPTS=0
-MAX=30
-until docker compose exec -T postgres pg_isready -U "${POSTGRES_USER:-kayakrent}" -q 2>/dev/null; do
+ATTEMPTS=0; MAX=30
+until docker compose exec -T postgres pg_isready -U "${POSTGRES_USER:-baydabaza}" -q 2>/dev/null; do
   ATTEMPTS=$((ATTEMPTS + 1))
-  if [ $ATTEMPTS -ge $MAX ]; then
-    error "PostgreSQL did not become ready after ${MAX} attempts. Check logs: docker compose logs postgres"
-  fi
-  echo -n "."
-  sleep 2
+  [ $ATTEMPTS -ge $MAX ] && error "PostgreSQL not ready after ${MAX} attempts. Check: docker compose logs postgres"
+  echo -n "."; sleep 2
 done
-echo ""
-success "PostgreSQL is ready"
+echo ""; success "PostgreSQL is ready"
 
 # ── 7. Wait for Redis ────────────────────────────────────────────────────────
 info "Waiting for Redis to be ready..."
 ATTEMPTS=0
 until docker compose exec -T redis redis-cli ping 2>/dev/null | grep -q PONG; do
   ATTEMPTS=$((ATTEMPTS + 1))
-  if [ $ATTEMPTS -ge 15 ]; then
-    error "Redis did not become ready. Check logs: docker compose logs redis"
-  fi
+  [ $ATTEMPTS -ge 15 ] && error "Redis not ready. Check: docker compose logs redis"
   sleep 1
 done
 success "Redis is ready"
 
 # ── 8. Run database migrations ───────────────────────────────────────────────
-info "Running database migrations..."
-docker compose run --rm --no-deps api \
-  sh -c "cd /app && pnpm --filter @workspace/db run push" \
-  || error "Migrations failed. Check logs above."
-success "Migrations applied"
+if [ "${APP_RUN_MIGRATIONS:-true}" = "true" ]; then
+  info "Running database migrations..."
+  docker compose run --rm --no-deps api \
+    sh -c "cd /app && pnpm --filter @workspace/db run push" \
+    || error "Migrations failed. Check logs above."
+  success "Migrations applied"
+else
+  warn "APP_RUN_MIGRATIONS=false — skipping migrations"
+fi
 
 # ── 9. Start API ─────────────────────────────────────────────────────────────
 info "Starting API server..."
@@ -111,65 +108,106 @@ success "API server started"
 
 # ── 10. Wait for API ─────────────────────────────────────────────────────────
 info "Waiting for API to be ready..."
-ATTEMPTS=0
-MAX=30
+ATTEMPTS=0; MAX=40
 API_PORT="${PORT:-8080}"
 until docker compose exec -T api wget -qO- "http://localhost:${API_PORT}/api/auth/healthz" >/dev/null 2>&1; do
   ATTEMPTS=$((ATTEMPTS + 1))
   if [ $ATTEMPTS -ge $MAX ]; then
-    warn "API health check timed out. Continuing anyway..."
+    warn "API health check timed out. Continuing anyway (check: docker compose logs api)..."
     break
   fi
-  echo -n "."
-  sleep 3
+  echo -n "."; sleep 3
 done
-echo ""
-success "API is ready"
+echo ""; success "API is ready"
 
-# ── 11. Seed initial data ────────────────────────────────────────────────────
-info "Seeding initial settings and admin account..."
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@baydabaza.ru}"
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-Admin123!}"
+# ── 11. Create superadmin ────────────────────────────────────────────────────
+if [ "${BOOTSTRAP_SUPERADMIN_CREATE:-false}" = "true" ]; then
+  info "Creating superadmin account..."
+  SA_EMAIL="${BOOTSTRAP_SUPERADMIN_EMAIL:-}"
+  SA_PASS="${BOOTSTRAP_SUPERADMIN_PASSWORD:-}"
+  SA_FIRST="${BOOTSTRAP_SUPERADMIN_FIRST_NAME:-Администратор}"
+  SA_LAST="${BOOTSTRAP_SUPERADMIN_LAST_NAME:-}"
+  SA_PHONE="${BOOTSTRAP_SUPERADMIN_PHONE:-}"
 
-TOKEN=$(docker compose exec -T api \
-  wget -qO- --header="Content-Type: application/json" \
-  --post-data="{\"email\":\"${ADMIN_EMAIL}\",\"password\":\"${ADMIN_PASSWORD}\"}" \
-  "http://localhost:${PORT:-8080}/api/auth/login" 2>/dev/null \
-  | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4 || true)
+  if [ -z "$SA_EMAIL" ] || [[ "$SA_EMAIL" == *"CHANGE_ME"* ]]; then
+    warn "BOOTSTRAP_SUPERADMIN_EMAIL not set — skipping superadmin creation"
+  elif [ -z "$SA_PASS" ] || [[ "$SA_PASS" == *"CHANGE_ME"* ]]; then
+    warn "BOOTSTRAP_SUPERADMIN_PASSWORD not set — skipping superadmin creation"
+  else
+    RESULT=$(docker compose exec -T api \
+      wget -qO- \
+        --header="Content-Type: application/json" \
+        --post-data="{\"email\":\"${SA_EMAIL}\",\"password\":\"${SA_PASS}\",\"firstName\":\"${SA_FIRST}\",\"lastName\":\"${SA_LAST}\",\"phone\":\"${SA_PHONE}\"}" \
+        "http://localhost:${API_PORT}/api/auth/setup-superadmin" 2>/dev/null || echo '{"error":"request failed"}')
 
-if [ -n "$TOKEN" ]; then
-  docker compose exec -T api \
-    wget -qO- --header="Authorization: Bearer $TOKEN" \
-    --header="Content-Type: application/json" \
-    --post-data='{}' \
-    "http://localhost:${PORT:-8080}/api/settings/init" >/dev/null 2>&1 || true
-  success "Initial settings seeded"
+    if echo "$RESULT" | grep -q '"skipped":true'; then
+      success "Superadmin already exists — skipped"
+    elif echo "$RESULT" | grep -q '"email"'; then
+      success "Superadmin created: ${SA_EMAIL}"
+    else
+      warn "Superadmin setup response: ${RESULT}"
+    fi
+  fi
 else
-  warn "Could not auto-seed settings (admin account may not exist yet). Run manually after first login: POST /api/settings/init"
+  warn "BOOTSTRAP_SUPERADMIN_CREATE=false — skipping superadmin creation"
+  warn "Set BOOTSTRAP_SUPERADMIN_CREATE=true in .env to create admin on install"
 fi
 
-# ── 12. Start web, admin, nginx ──────────────────────────────────────────────
+# ── 12. Seed initial settings ────────────────────────────────────────────────
+if [ "${APP_RUN_SEED:-true}" = "true" ]; then
+  info "Seeding initial settings..."
+  SA_EMAIL="${BOOTSTRAP_SUPERADMIN_EMAIL:-${ADMIN_EMAIL:-}}"
+  SA_PASS="${BOOTSTRAP_SUPERADMIN_PASSWORD:-${ADMIN_PASSWORD:-}}"
+
+  if [ -n "$SA_EMAIL" ] && [ -n "$SA_PASS" ]; then
+    TOKEN=$(docker compose exec -T api \
+      wget -qO- \
+        --header="Content-Type: application/json" \
+        --post-data="{\"email\":\"${SA_EMAIL}\",\"password\":\"${SA_PASS}\"}" \
+        "http://localhost:${API_PORT}/api/auth/login" 2>/dev/null \
+      | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4 || true)
+
+    if [ -n "$TOKEN" ]; then
+      docker compose exec -T api \
+        wget -qO- \
+          --header="Authorization: Bearer $TOKEN" \
+          --header="Content-Type: application/json" \
+          --post-data='{}' \
+          "http://localhost:${API_PORT}/api/settings/init" >/dev/null 2>&1 || true
+      success "Initial settings seeded"
+    else
+      warn "Could not login to seed settings. Run POST /api/settings/init manually after first login."
+    fi
+  else
+    warn "No admin credentials found in env — skipping settings seed"
+  fi
+else
+  warn "APP_RUN_SEED=false — skipping settings seed"
+fi
+
+# ── 13. Start web, admin, nginx ──────────────────────────────────────────────
 info "Starting web, admin CRM, and nginx..."
 docker compose up -d web admin nginx
 success "All services started"
 
-# ── 13. Summary ──────────────────────────────────────────────────────────────
+# ── 14. Final status ─────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}${GREEN}════════════════════════════════════════════${RESET}"
 echo -e "${BOLD}${GREEN}  ✓ Installation complete!${RESET}"
 echo -e "${BOLD}${GREEN}════════════════════════════════════════════${RESET}"
 echo ""
-echo -e "  ${CYAN}Public site:${RESET}  ${APP_URL:-http://YOUR_DOMAIN}"
-echo -e "  ${CYAN}Admin CRM:${RESET}    ${ADMIN_URL:-http://YOUR_DOMAIN/crm}"
-echo -e "  ${CYAN}API:${RESET}          ${API_URL:-http://YOUR_DOMAIN/api}"
+echo -e "  ${CYAN}Public site:${RESET}  ${APP_URL:-http://your-domain.ru}"
+echo -e "  ${CYAN}Admin CRM:${RESET}    ${ADMIN_URL:-http://your-domain.ru/crm}"
+echo -e "  ${CYAN}API:${RESET}          ${API_URL:-http://your-domain.ru/api}"
 echo ""
-echo -e "  ${CYAN}Admin login:${RESET}  ${ADMIN_EMAIL:-admin@baydabaza.ru}"
-echo -e "  ${CYAN}Admin pass:${RESET}   ${ADMIN_PASSWORD:-Admin123!}"
+if [ "${BOOTSTRAP_SUPERADMIN_CREATE:-false}" = "true" ] && [ -n "${BOOTSTRAP_SUPERADMIN_EMAIL:-}" ]; then
+  echo -e "  ${CYAN}Admin login:${RESET}  ${BOOTSTRAP_SUPERADMIN_EMAIL}"
+fi
 echo ""
 echo -e "  ${YELLOW}Next steps:${RESET}"
 echo -e "  • Set up SSL: copy fullchain.pem + privkey.pem to docker/ssl/"
-echo -e "  • Update nginx.conf: replace YOUR_DOMAIN with your real domain"
-echo -e "  • Change admin password in CRM Settings"
-echo -e "  • Configure Telegram bot token in CRM Settings"
+echo -e "  • Update nginx: replace YOUR_DOMAIN in docker/nginx.conf"
+echo -e "  • Change admin password in CRM → Профиль"
+echo -e "  • Fill in company contacts in CRM → Настройки → Общие"
 echo ""
 docker compose ps

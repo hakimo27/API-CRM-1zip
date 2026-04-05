@@ -54,7 +54,7 @@ check "Categories API"                                "curl -sf '${BASE_URL}/api
 
 echo ""
 echo -e "${CYAN}Database:${RESET}"
-check "PostgreSQL responding" "docker compose exec -T postgres pg_isready -U '${POSTGRES_USER:-kayakrent}' -q"
+check "PostgreSQL responding" "docker compose exec -T postgres pg_isready -U '${POSTGRES_USER:-baydabaza}' -q"
 
 echo ""
 echo -e "────────────────────────────────────────"

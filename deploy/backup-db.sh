@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# КаякРент — PostgreSQL backup script
+# Байдабаза — PostgreSQL backup script
 # Usage:
 #   ./deploy/backup-db.sh                        # creates timestamped dump
 #   ./deploy/backup-db.sh my-backup.sql          # custom filename
@@ -23,8 +23,8 @@ echo "▶ Creating PostgreSQL dump → ${BACKUP_DIR}/${FILENAME}"
 # Docker-compose: dump from running container
 if command -v docker &> /dev/null; then
   docker compose exec -T postgres pg_dump \
-    -U "${POSTGRES_USER:-kayakrent}" \
-    "${POSTGRES_DB:-kayakrent}" \
+    -U "${POSTGRES_USER:-baydabaza}" \
+    "${POSTGRES_DB:-baydabaza}" \
     > "${BACKUP_DIR}/${FILENAME}"
 else
   # Direct pg_dump (requires DATABASE_URL)

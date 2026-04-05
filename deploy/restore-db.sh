@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# КаякРент — PostgreSQL restore script
+# Байдабаза — PostgreSQL restore script
 # Usage:
 #   ./deploy/restore-db.sh ./backups/backup_20250101_120000.sql.gz
 # ─────────────────────────────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ if [ ! -f "$BACKUP_FILE" ]; then
   exit 1
 fi
 
-echo "⚠ WARNING: This will DROP and recreate the database '${POSTGRES_DB:-kayakrent}'!"
+echo "⚠ WARNING: This will DROP and recreate the database '${POSTGRES_DB:-baydabaza}'!"
 read -r -p "Continue? (yes/no): " CONFIRM
 if [ "$CONFIRM" != "yes" ]; then
   echo "Aborted."
@@ -34,14 +34,14 @@ echo "▶ Restoring database from: $BACKUP_FILE"
 if command -v docker &> /dev/null; then
   # Drop and recreate via docker compose
   docker compose exec -T postgres psql \
-    -U "${POSTGRES_USER:-kayakrent}" \
-    -c "DROP DATABASE IF EXISTS ${POSTGRES_DB:-kayakrent};" \
-    -c "CREATE DATABASE ${POSTGRES_DB:-kayakrent};"
+    -U "${POSTGRES_USER:-baydabaza}" \
+    -c "DROP DATABASE IF EXISTS ${POSTGRES_DB:-baydabaza};" \
+    -c "CREATE DATABASE ${POSTGRES_DB:-baydabaza};"
 
   # Restore
   gunzip -c "$BACKUP_FILE" | docker compose exec -T postgres psql \
-    -U "${POSTGRES_USER:-kayakrent}" \
-    "${POSTGRES_DB:-kayakrent}"
+    -U "${POSTGRES_USER:-baydabaza}" \
+    "${POSTGRES_DB:-baydabaza}"
 else
   gunzip -c "$BACKUP_FILE" | psql "${DATABASE_URL}"
 fi

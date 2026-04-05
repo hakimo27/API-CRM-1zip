@@ -1,4 +1,4 @@
-# Байдабаза — Production Deployment Guide
+# Байдабаза — Руководство по развёртыванию
 
 ## Требования к серверу
 
@@ -20,7 +20,7 @@ newgrp docker
 
 ---
 
-## Установка (первый запуск)
+## Установка одной командой
 
 ```bash
 # 1. Скопировать проект на сервер
@@ -28,75 +28,105 @@ scp -r . user@your-server:/opt/baydabaza
 ssh user@your-server
 cd /opt/baydabaza
 
-# 2. Создать .env из примера
+# 2. Настроить окружение
 cp .env.example .env
-nano .env          # заполнить обязательные переменные
+nano .env          # заполнить обязательные переменные (см. ниже)
 
-# 3. Запустить установку
+# 3. Запустить автоустановщик
 sh deploy/install.sh
 ```
 
 Скрипт автоматически:
+- проверит Docker и переменные окружения
 - соберёт Docker-образы
-- поднимет PostgreSQL, Redis
+- поднимет PostgreSQL и Redis
 - применит миграции БД
-- запустит API, сайт, CRM, nginx
-- создаст начальные настройки
+- запустит API, проверит его готовность
+- создаст суперадмина (если `BOOTSTRAP_SUPERADMIN_CREATE=true`)
+- посеет начальные настройки (если `APP_RUN_SEED=true`)
+- запустит сайт, CRM и nginx
+- покажет финальный статус всех сервисов
 
 ---
 
-## Что нужно заполнить в .env
+## Что заполнить в .env
 
-**Обязательно:**
+### Обязательные переменные
+
 ```env
+# База данных
 POSTGRES_PASSWORD=очень_сильный_пароль
-JWT_SECRET=случайная_строка_64_символа
-JWT_REFRESH_SECRET=другая_случайная_строка_64
-SESSION_SECRET=ещё_одна_строка_32_символа
+DATABASE_URL=postgresql://baydabaza:очень_сильный_пароль@postgres:5432/baydabaza
 
+# JWT — сгенерировать: openssl rand -hex 64
+JWT_SECRET=случайная_строка_64_символа
+JWT_REFRESH_SECRET=другая_случайная_строка_64_символа
+# Сгенерировать: openssl rand -hex 32
+SESSION_SECRET=строка_32_символа
+
+# Домен
 APP_URL=https://ваш-домен.ru
 ADMIN_URL=https://ваш-домен.ru/crm
 API_URL=https://ваш-домен.ru/api
-
-ADMIN_EMAIL=admin@ваш-домен.ru
-ADMIN_PASSWORD=надёжный_пароль
 ```
 
-Сгенерировать случайные строки:
+Сгенерировать секреты одной командой:
 ```bash
-openssl rand -hex 64   # для JWT_SECRET и JWT_REFRESH_SECRET
-openssl rand -hex 32   # для SESSION_SECRET
+echo "JWT_SECRET=$(openssl rand -hex 64)"
+echo "JWT_REFRESH_SECRET=$(openssl rand -hex 64)"
+echo "SESSION_SECRET=$(openssl rand -hex 32)"
 ```
+
+### Флаги первой установки
+
+```env
+APP_RUN_MIGRATIONS=true      # применить миграции БД
+APP_RUN_SEED=true            # посеять начальные настройки
+APP_RUN_DEMO_SEED=false      # демо-данные (только для стенда)
+```
+
+### Создание суперадмина
+
+```env
+BOOTSTRAP_SUPERADMIN_CREATE=true
+BOOTSTRAP_SUPERADMIN_EMAIL=admin@ваш-домен.ru
+BOOTSTRAP_SUPERADMIN_PASSWORD=надёжный_пароль
+BOOTSTRAP_SUPERADMIN_FIRST_NAME=Администратор
+BOOTSTRAP_SUPERADMIN_LAST_NAME=
+BOOTSTRAP_SUPERADMIN_PHONE=
+```
+
+Если суперадмин уже создан — шаг автоматически пропускается.  
+После успешной установки рекомендуется установить `BOOTSTRAP_SUPERADMIN_CREATE=false`.
 
 ---
 
-## Где открывается
+## Куда открывается
 
 | Что | URL |
 |-----|-----|
-| Сайт | `https://ваш-домен.ru` |
-| CRM (панель управления) | `https://ваш-домен.ru/crm` |
-| API | `https://ваш-домен.ru/api` |
+| Публичный сайт | `https://ваш-домен.ru` |
+| Панель управления (CRM) | `https://ваш-домен.ru/crm` |
+| REST API | `https://ваш-домен.ru/api` |
 | Health check | `https://ваш-домен.ru/api/auth/healthz` |
 
 ---
 
 ## Обновление
 
-После изменений в коде:
 ```bash
 sh deploy/update.sh
 ```
 
 Скрипт:
-1. Делает резервную копию БД
+1. Создаёт резервную копию БД
 2. Пересобирает образы
 3. Применяет новые миграции
-4. Перезапускает сервисы
+4. Перезапускает сервисы без потери данных
 
 ---
 
-## Резервная копия БД
+## Резервные копии БД
 
 ```bash
 # Создать бэкап (сохраняется в ./backups/)
@@ -114,7 +144,7 @@ sh deploy/restore-db.sh ./backups/backup_20250101_120000.sql.gz
 # Статус всех сервисов
 sh deploy/healthcheck.sh
 
-# Логи конкретного сервиса
+# Логи сервиса
 docker compose logs -f api
 docker compose logs -f nginx
 
@@ -126,20 +156,20 @@ docker compose ps
 
 ## SSL (HTTPS)
 
-### Вариант 1: Certbot (Let's Encrypt) — рекомендуется
+### Вариант 1: Let's Encrypt — рекомендуется
 
 ```bash
 # Установить certbot
 apt install certbot
 
-# Получить сертификат (nginx должен работать на 80)
+# Получить сертификат (nginx должен работать на порту 80)
 certbot certonly --webroot -w /var/www/certbot -d ваш-домен.ru
 
 # Скопировать сертификаты
 cp /etc/letsencrypt/live/ваш-домен.ru/fullchain.pem docker/ssl/
 cp /etc/letsencrypt/live/ваш-домен.ru/privkey.pem docker/ssl/
 
-# В nginx.conf заменить YOUR_DOMAIN на ваш домен
+# Заменить YOUR_DOMAIN в nginx.conf на реальный домен
 nano docker/nginx.conf
 
 # Перезапустить nginx
@@ -149,24 +179,22 @@ docker compose restart nginx
 ### Вариант 2: Cloudflare Proxy
 
 Включить Cloudflare Proxy (оранжевое облако) — SSL будет автоматически.
-В nginx.conf можно использовать HTTP-only конфиг.
 
 ---
 
-## DNS настройка
+## DNS
 
-Укажите у регистратора домена:
 ```
-A    @           →  IP вашего сервера
-A    www         →  IP вашего сервера
+A    @    →  IP вашего сервера
+A    www  →  IP вашего сервера
 ```
 
 ---
 
-## Telegram бот (опционально)
+## Telegram-бот (опционально)
 
 1. Создать бота через @BotFather
-2. Получить токен и вставить в `.env`:
+2. Вписать токен в `.env`:
    ```env
    TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
    ```
@@ -184,20 +212,20 @@ A    www         →  IP вашего сервера
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your@gmail.com
-SMTP_PASS=app_password    # не обычный пароль, а App Password
-SMTP_FROM=noreply@baydabaza.ru
+SMTP_PASS=app_password
+SMTP_FROM=noreply@ваш-домен.ru
 ```
 
 ---
 
-## Что остаётся сделать руками после установки
+## Что сделать после установки
 
 | Действие | Где |
 |----------|-----|
 | Поменять пароль admin | CRM → Профиль |
 | Заполнить контакты компании | CRM → Настройки → Общие |
 | Загрузить логотип | CRM → Настройки → Брендинг |
-| Настроить Telegram бот | CRM → Настройки → Telegram |
+| Настроить Telegram-бот | CRM → Настройки → Telegram |
 | Настроить SMTP | CRM → Настройки → Уведомления |
 | Добавить категории | CRM → Каталог → Категории |
 | Добавить товары | CRM → Каталог → Товары |
@@ -205,27 +233,25 @@ SMTP_FROM=noreply@baydabaza.ru
 
 ---
 
-## Структура deployment файлов
+## Структура deployment-файлов
 
 ```
 .
-├── .env.example              # шаблон переменных
+├── .env.example              # шаблон переменных окружения
 ├── docker-compose.yml        # все сервисы
 ├── Dockerfile.api            # образ для API
 ├── Dockerfile.web            # образ для публичного сайта
 ├── Dockerfile.admin          # образ для CRM
 ├── docker/
-│   ├── nginx.conf            # главный nginx (HTTPS + routing)
-│   ├── nginx-web.conf        # nginx внутри web контейнера
-│   ├── nginx-admin.conf      # nginx внутри admin контейнера
-│   └── ssl/                  # место для SSL сертификатов
+│   ├── nginx.conf            # nginx (HTTPS + роутинг)
+│   └── ssl/                  # SSL-сертификаты
 ├── deploy/
-│   ├── install.sh            # первый запуск (полная установка)
+│   ├── install.sh            # ← главная команда установки
 │   ├── update.sh             # обновление без потери данных
-│   ├── healthcheck.sh        # проверка состояния всех сервисов
-│   ├── init-db.sh            # инициализация/seed БД
 │   ├── backup-db.sh          # резервная копия PostgreSQL
-│   └── restore-db.sh         # восстановление из бэкапа
+│   ├── restore-db.sh         # восстановление из бэкапа
+│   ├── healthcheck.sh        # проверка состояния сервисов
+│   └── init-db.sh            # ручная инициализация БД
 └── backups/                  # папка для бэкапов (создаётся автоматически)
 ```
 
@@ -248,11 +274,18 @@ docker compose restart nginx
 
 **Как зайти в БД?**
 ```bash
-docker compose exec postgres psql -U kayakrent kayakrent
+docker compose exec postgres psql -U baydabaza baydabaza
 ```
 
 **Как полностью сбросить и переустановить?**
 ```bash
 docker compose down -v    # ВНИМАНИЕ: удалит все данные!
 sh deploy/install.sh
+```
+
+**API не запускается?**
+```bash
+docker compose logs api
+# Проверить DATABASE_URL, JWT_SECRET в .env
+docker compose ps
 ```
