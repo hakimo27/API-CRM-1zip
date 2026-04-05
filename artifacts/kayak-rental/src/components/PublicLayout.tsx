@@ -1,8 +1,9 @@
 import { Link } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
+import { useSaleCart } from '@/contexts/SaleCartContext';
 import { useQuery } from '@tanstack/react-query';
-import { ShoppingCart, Menu, X, User, Phone, Mail, MessageCircle, MapPin, Clock } from 'lucide-react';
+import { ShoppingCart, ShoppingBag, Menu, X, User, Phone, Mail, MessageCircle, MapPin, Clock } from 'lucide-react';
 import { useState } from 'react';
 import ChatWidget from './ChatWidget';
 
@@ -75,6 +76,7 @@ function LogoMarkLight({ name, logoUrl, logoLightUrl }: { name: string; logoUrl:
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const { itemCount } = useCart();
+  const { itemCount: saleItemCount } = useSaleCart();
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const { data: settings = {}, isSuccess: settingsLoaded } = usePublicSettings();
@@ -125,7 +127,16 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                 <span>{phone}</span>
               </a>
 
-              <Link href="/cart" className="relative p-2 text-gray-700 hover:text-blue-600 transition-colors">
+              {saleItemCount > 0 && (
+                <Link href="/sale/cart" className="relative p-2 text-gray-700 hover:text-orange-600 transition-colors" title="Корзина покупок">
+                  <ShoppingBag className="w-5 h-5" />
+                  <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                    {saleItemCount}
+                  </span>
+                </Link>
+              )}
+
+              <Link href="/cart" className="relative p-2 text-gray-700 hover:text-blue-600 transition-colors" title="Корзина аренды">
                 <ShoppingCart className="w-5 h-5" />
                 {itemCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">

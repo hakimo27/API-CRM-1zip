@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Search, Tag, Package } from 'lucide-react';
+import { useSaleCart } from '@/contexts/SaleCartContext';
+import { Search, Tag, Package, ShoppingCart, Check } from 'lucide-react';
 
 interface SaleProduct {
   id: number;
@@ -40,10 +41,32 @@ function ProductCard({ product }: { product: SaleProduct }) {
   const discount = oldPrice ? Math.round((1 - price / oldPrice) * 100) : null;
   const stock = STOCK_LABELS[product.stockStatus] || { label: product.stockStatus, color: 'text-gray-600 bg-gray-50' };
   const mainImage = product.images?.[0];
+  const canBuy = product.stockStatus !== 'out_of_stock';
+  const { addItem, items } = useSaleCart();
+  const [added, setAdded] = useState(false);
+  const inCart = items.some(i => i.productId === product.id);
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addItem({
+      productId: product.id,
+      slug: product.slug,
+      name: product.name,
+      image: mainImage || null,
+      price,
+      oldPrice,
+      quantity: 1,
+      maxQuantity: product.stockQuantity || 99,
+      stockStatus: product.stockStatus,
+    });
+    setAdded(true);
+    setTimeout(() => setAdded(false), 2000);
+  };
 
   return (
-    <Link href={`/sale/${product.slug}`}>
-      <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all border border-gray-100 overflow-hidden group cursor-pointer">
+    <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all border border-gray-100 overflow-hidden group flex flex-col">
+      <Link href={`/sale/${product.slug}`} className="flex-1">
         <div className="relative aspect-square bg-gradient-to-br from-gray-50 to-blue-50 flex items-center justify-center overflow-hidden">
           {mainImage ? (
             <img src={mainImage} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -80,22 +103,38 @@ function ProductCard({ product }: { product: SaleProduct }) {
             <p className="text-sm text-gray-500 mb-3 line-clamp-2">{product.shortDescription}</p>
           )}
 
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-xl font-bold text-gray-900">{price.toLocaleString('ru-RU')} ₽</span>
-                {oldPrice && (
-                  <span className="text-sm text-gray-400 line-through">{oldPrice.toLocaleString('ru-RU')} ₽</span>
-                )}
-              </div>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-gray-900">{price.toLocaleString('ru-RU')} ₽</span>
+              {oldPrice && (
+                <span className="text-sm text-gray-400 line-through">{oldPrice.toLocaleString('ru-RU')} ₽</span>
+              )}
             </div>
             <span className={`text-xs px-2 py-1 rounded-full font-medium ${stock.color}`}>
               {stock.label}
             </span>
           </div>
         </div>
+      </Link>
+
+      <div className="px-4 pb-4">
+        {canBuy ? (
+          <button onClick={handleAddToCart}
+            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              added || inCart
+                ? 'bg-green-50 text-green-700 border border-green-200'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}>
+            {added ? <><Check className="w-4 h-4" /> Добавлено</> : inCart ? <><Check className="w-4 h-4" /> В корзине</> : <><ShoppingCart className="w-4 h-4" /> В корзину</>}
+          </button>
+        ) : (
+          <Link href={`/sale/${product.slug}`}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 text-gray-500 cursor-default">
+            Нет в наличии
+          </Link>
+        )}
       </div>
-    </Link>
+    </div>
   );
 }
 

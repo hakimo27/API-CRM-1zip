@@ -99,12 +99,17 @@ export class SalesService {
       .leftJoin(saleProductsTable, eq(saleOrderItemsTable.productId, saleProductsTable.id))
       .where(inArray(saleOrderItemsTable.orderId, orderIds));
 
-    return orders.map((order) => ({
-      ...order,
-      items: items
-        .filter((i) => i.item.orderId === order.id)
-        .map(({ item, product }) => ({ ...item, product })),
-    }));
+    return orders.map((order) => {
+      const addr = (order.deliveryAddress as any) || {};
+      return {
+        ...order,
+        customerName: order.customerName || addr.name || null,
+        customerPhone: order.customerPhone || addr.phone || null,
+        items: items
+          .filter((i) => i.item.orderId === order.id)
+          .map(({ item, product }) => ({ ...item, product })),
+      };
+    });
   }
 
   async findOrderById(id: number) {
@@ -121,8 +126,11 @@ export class SalesService {
       .leftJoin(saleProductsTable, eq(saleOrderItemsTable.productId, saleProductsTable.id))
       .where(eq(saleOrderItemsTable.orderId, id));
 
+    const addr = (order.deliveryAddress as any) || {};
     return {
       ...order,
+      customerName: order.customerName || addr.name || null,
+      customerPhone: order.customerPhone || addr.phone || null,
       items: items.map(({ item, product }) => ({ ...item, product })),
     };
   }

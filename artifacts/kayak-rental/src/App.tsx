@@ -4,12 +4,15 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { CartProvider } from '@/contexts/CartContext';
+import { SaleCartProvider } from '@/contexts/SaleCartContext';
 import PublicLayout from '@/components/PublicLayout';
 import HomePage from '@/pages/HomePage';
 import CatalogPage from '@/pages/CatalogPage';
 import ProductPage from '@/pages/ProductPage';
 import SaleCatalogPage from '@/pages/SaleCatalogPage';
 import SaleProductPage from '@/pages/SaleProductPage';
+import SaleCartPage from '@/pages/SaleCartPage';
+import SaleCheckoutPage from '@/pages/SaleCheckoutPage';
 import CartPage from '@/pages/CartPage';
 import CheckoutPage from '@/pages/CheckoutPage';
 import OrderConfirmPage from '@/pages/OrderConfirmPage';
@@ -34,6 +37,8 @@ function AppRoutes() {
         <Route path="/catalog" component={CatalogPage} />
         <Route path="/catalog/:slug" component={ProductPage} />
         <Route path="/sale" component={SaleCatalogPage} />
+        <Route path="/sale/cart" component={SaleCartPage} />
+        <Route path="/sale/checkout" component={SaleCheckoutPage} />
         <Route path="/sale/:slug" component={SaleProductPage} />
         <Route path="/cart" component={CartPage} />
         <Route path="/checkout" component={CheckoutPage} />
@@ -56,10 +61,12 @@ export default function App() {
       <TooltipProvider>
         <AuthProvider>
           <CartProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-              <AppRoutes />
-            </WouterRouter>
-            <Toaster />
+            <SaleCartProvider>
+              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+                <AppRoutes />
+              </WouterRouter>
+              <Toaster />
+            </SaleCartProvider>
           </CartProvider>
         </AuthProvider>
       </TooltipProvider>
