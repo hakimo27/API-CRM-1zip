@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Tag, ExternalLink, Search, Plus, Edit, Trash2, X, Save, ChevronDown, ChevronUp } from 'lucide-react';
+import { Tag, ExternalLink, Search, Plus, Edit, Trash2, X, Save, ChevronDown } from 'lucide-react';
 import ImageUpload from '@/components/ImageUpload';
-import { useState, useEffect, useCallback } from 'react';
+import SpecEditor, { type SpecRow } from '@/components/SpecEditor';
+import RichTextEditor from '@/components/RichTextEditor';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 const DOMAIN_SCOPE_LABELS: Record<string, string> = {
   rental: 'Аренда', sale: 'Продажа', both: 'Аренда + Продажа',
@@ -28,6 +30,7 @@ type ProductForm = {
   totalStock: string;
   metaTitle: string; metaDescription: string; ogTitle: string; ogDescription: string; canonicalUrl: string;
   tariffs: Tariff[];
+  specs: SpecRow[];
   images: string[];
 };
 
@@ -37,6 +40,7 @@ const EMPTY_FORM: ProductForm = {
   depositAmount: '', badge: '', totalStock: '0',
   metaTitle: '', metaDescription: '', ogTitle: '', ogDescription: '', canonicalUrl: '',
   tariffs: [{ type: 'weekday', label: 'Будни', pricePerDay: '', minDays: '1' }],
+  specs: [],
   images: [],
 };
 
@@ -47,7 +51,93 @@ function slugify(str: string) {
   }).replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
 
-type ModalTab = 'basic' | 'tariffs' | 'photos' | 'seo';
+type ModalTab = 'basic' | 'specs' | 'tariffs' | 'photos' | 'seo';
+
+function TariffTemplateDropdown({ onApply }: { onApply: (tariffs: Tariff[]) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const { data: templates = [] } = useQuery<any[]>({
+    queryKey: ['tariff-templates'],
+    queryFn: () => api.get('/templates/tariff-templates'),
+  });
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  if (templates.length === 0) return null;
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50">
+        Применить шаблон <ChevronDown className="w-3.5 h-3.5" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-lg border border-gray-100 z-10 overflow-hidden">
+          {templates.map((t: any) => (
+            <button key={t.id} type="button"
+              onClick={() => {
+                const mapped: Tariff[] = (t.tariffs || []).map((r: any) => ({
+                  type: r.type, label: r.label,
+                  pricePerDay: String(r.pricePerDay || ''),
+                  minDays: String(r.minDays || '1'),
+                }));
+                onApply(mapped);
+                setOpen(false);
+              }}
+              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+              {t.name} <span className="text-xs text-gray-400">({(t.tariffs || []).length} тарифа)</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SpecTemplateDropdown({ onApply }: { onApply: (specs: SpecRow[]) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const { data: templates = [] } = useQuery<any[]>({
+    queryKey: ['spec-templates'],
+    queryFn: () => api.get('/templates/spec-templates'),
+  });
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  if (templates.length === 0) return null;
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50">
+        Применить шаблон <ChevronDown className="w-3.5 h-3.5" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-xl shadow-lg border border-gray-100 z-10 overflow-hidden">
+          {templates.map((t: any) => (
+            <button key={t.id} type="button"
+              onClick={() => {
+                const mapped: SpecRow[] = (t.specs || []).map((s: any, i: number) => ({
+                  label: s.label || '', value: s.value || '', unit: s.unit || '', sortOrder: i,
+                }));
+                onApply(mapped);
+                setOpen(false);
+              }}
+              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+              {t.name} <span className="text-xs text-gray-400">({(t.specs || []).length} характеристик)</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ProductsPage() {
   const qc = useQueryClient();
@@ -91,6 +181,7 @@ export default function ProductsPage() {
   };
 
   const openEdit = (p: any) => {
+    const rawSpecs = Array.isArray(p.specifications) ? p.specifications : [];
     setForm({
       name: p.name || '', slug: p.slug || '', sku: p.sku || '',
       categoryId: String(p.categoryId || ''), domainScope: p.domainScope || 'rental',
@@ -104,6 +195,7 @@ export default function ProductsPage() {
       tariffs: p.tariffs?.length
         ? p.tariffs.map((t: any) => ({ id: t.id, type: t.type, label: t.label, pricePerDay: String(t.pricePerDay || ''), minDays: String(t.minDays || '1') }))
         : [{ type: 'weekday', label: 'Будни', pricePerDay: '', minDays: '1' }],
+      specs: rawSpecs.map((s: any, i: number) => ({ label: s.label || '', value: s.value || '', unit: s.unit || '', sortOrder: i })),
       images: Array.isArray(p.images) ? p.images.map((img: any) => typeof img === 'string' ? img : img.url) : [],
     });
     setEditProduct(p);
@@ -139,6 +231,9 @@ export default function ProductsPage() {
         metaTitle: form.metaTitle || undefined, metaDescription: form.metaDescription || undefined,
         ogTitle: form.ogTitle || undefined, ogDescription: form.ogDescription || undefined,
         canonicalUrl: form.canonicalUrl || undefined,
+        specifications: form.specs.length > 0
+          ? form.specs.map((s, i) => ({ label: s.label, value: s.value, unit: s.unit, sortOrder: i }))
+          : null,
         tariffs: form.tariffs.filter(t => t.pricePerDay).map(t => ({
           type: t.type, label: t.label,
           pricePerDay: t.pricePerDay, minDays: t.minDays ? Number(t.minDays) : null,
@@ -164,6 +259,14 @@ export default function ProductsPage() {
     mutationFn: (id: number) => api.delete(`/products/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['products-admin'] }); setDeleteId(null); },
   });
+
+  const TAB_LABELS: Record<ModalTab, string> = {
+    basic: 'Основное',
+    specs: `Характеристики${form.specs.length ? ` (${form.specs.length})` : ''}`,
+    tariffs: 'Тарифы',
+    photos: `Фото (${form.images.length})`,
+    seo: 'SEO',
+  };
 
   return (
     <div className="space-y-4">
@@ -326,13 +429,13 @@ export default function ProductsPage() {
             </div>
 
             {/* Modal Tabs */}
-            <div className="flex border-b border-gray-100">
-              {(['basic', 'tariffs', 'photos', 'seo'] as const).map(tab => (
+            <div className="flex border-b border-gray-100 overflow-x-auto">
+              {(['basic', 'specs', 'tariffs', 'photos', 'seo'] as ModalTab[]).map(tab => (
                 <button key={tab} onClick={() => setModalTab(tab)}
-                  className={`px-5 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap ${
                     modalTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}>
-                  {tab === 'basic' ? 'Основное' : tab === 'tariffs' ? 'Тарифы' : tab === 'photos' ? `Фото (${form.images.length})` : 'SEO'}
+                  {TAB_LABELS[tab]}
                 </button>
               ))}
             </div>
@@ -388,8 +491,7 @@ export default function ProductsPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Общий склад (кол-во ед.)
-                        <span className="ml-1 text-gray-400 font-normal">— всего единиц товара</span>
+                        Склад (кол-во ед.)
                       </label>
                       <input type="number" min="0" value={form.totalStock} onChange={e => setField('totalStock', e.target.value)}
                         className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -409,9 +511,12 @@ export default function ProductsPage() {
                     </div>
                     <div className="col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">Полное описание</label>
-                      <textarea value={form.fullDescription} onChange={e => setField('fullDescription', e.target.value)}
-                        rows={4} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                        placeholder="Подробное описание..." />
+                      <RichTextEditor
+                        value={form.fullDescription}
+                        onChange={v => setField('fullDescription', v)}
+                        placeholder="Подробное описание товара..."
+                        minHeight={180}
+                      />
                     </div>
                     <div className="flex items-center gap-6">
                       <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -429,16 +534,53 @@ export default function ProductsPage() {
                 </div>
               )}
 
+              {/* Specs Tab */}
+              {modalTab === 'specs' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-700 font-medium">Характеристики товара</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Заполните поля: Название, Значение и Единица измерения</p>
+                    </div>
+                    <SpecTemplateDropdown onApply={specs => setField('specs', specs)} />
+                  </div>
+                  {form.specs.length > 0 && (
+                    <div className="grid grid-cols-3 gap-1 mb-1">
+                      <span className="text-xs font-medium text-gray-500 px-2">Название</span>
+                      <span className="text-xs font-medium text-gray-500 px-2">Значение</span>
+                      <span className="text-xs font-medium text-gray-500 px-2">Единица</span>
+                    </div>
+                  )}
+                  <SpecEditor specs={form.specs} onChange={specs => setField('specs', specs)} />
+                  {form.specs.length > 0 && (
+                    <div className="mt-4 p-3 bg-blue-50 rounded-xl">
+                      <p className="text-xs font-medium text-blue-700 mb-2">Предпросмотр на сайте:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {form.specs.filter(s => s.label && s.value).map((s, i) => (
+                          <div key={i} className="bg-white rounded-lg px-3 py-1.5 shadow-sm">
+                            <span className="text-xs text-gray-500">{s.label}: </span>
+                            <span className="text-xs font-semibold text-blue-700">{s.value}{s.unit ? ` ${s.unit}` : ''}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Tariffs Tab */}
               {modalTab === 'tariffs' && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-500">Укажите тарифы для товара (цена за день)</p>
-                    <button
-                      onClick={() => setForm(f => ({ ...f, tariffs: [...f.tariffs, { type: 'weekday', label: 'Новый тариф', pricePerDay: '', minDays: '1' }] }))}
-                      className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline font-medium">
-                      <Plus className="w-3.5 h-3.5" /> Добавить тариф
-                    </button>
+                    <p className="text-sm text-gray-500">Укажите тарифы (цена за день)</p>
+                    <div className="flex items-center gap-2">
+                      <TariffTemplateDropdown onApply={tariffs => setField('tariffs', tariffs)} />
+                      <button
+                        onClick={() => setForm(f => ({ ...f, tariffs: [...f.tariffs, { type: 'weekday', label: 'Новый тариф', pricePerDay: '', minDays: '1' }] }))}
+                        className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline font-medium">
+                        <Plus className="w-3.5 h-3.5" /> Добавить
+                      </button>
+                    </div>
                   </div>
                   {form.tariffs.map((tariff, idx) => (
                     <div key={idx} className="bg-gray-50 rounded-xl p-4 space-y-3">

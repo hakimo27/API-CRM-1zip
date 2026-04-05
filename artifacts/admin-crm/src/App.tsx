@@ -27,6 +27,7 @@ import SaleProductsPage from '@/pages/SaleProductsPage';
 import ContentPage from '@/pages/ContentPage';
 import LogsPage from '@/pages/LogsPage';
 import MediaPage from '@/pages/MediaPage';
+import TemplatesPage from '@/pages/TemplatesPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import { useEffect } from 'react';
 
@@ -82,6 +83,7 @@ function CrmRoutes() {
       <Route path="/categories"><G><CategoriesPage /></G></Route>
       <Route path="/inventory"><G><InventoryPage /></G></Route>
       <Route path="/media"><G><MediaPage /></G></Route>
+      <Route path="/templates"><G><TemplatesPage /></G></Route>
 
       {/* Tours */}
       <Route path="/tours"><G><ToursPage /></G></Route>

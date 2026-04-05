@@ -12,6 +12,10 @@ interface Tariff {
   pricePerDay: number; minDays: number | null; description: string | null;
 }
 
+interface SpecRow {
+  label: string; value: string; unit: string; sortOrder: number;
+}
+
 interface ProductDetail {
   id: number; name: string; slug: string; sku: string | null;
   categoryId: number; categoryName: string; shortDescription: string | null;
@@ -19,6 +23,7 @@ interface ProductDetail {
   constructionType: string | null; weight: string | null; dimensions: string | null;
   kit: string | null; depositAmount: number | null; featured: boolean;
   badge: string | null; tariffs: Tariff[];
+  specifications: SpecRow[] | null;
   images: Array<{ id: number; url: string; alt: string | null }>;
 }
 
@@ -185,7 +190,22 @@ export default function ProductPage() {
           )}
 
           {/* Specs */}
-          {(product.capacity || product.constructionType || product.weight) && (
+          {/* Specifications from CRM (specifications jsonb) */}
+          {product.specifications && product.specifications.length > 0 && (
+            <div className="mb-6">
+              <h3 className="font-semibold text-gray-900 mb-3">Характеристики</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {[...product.specifications].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map((spec, i) => (
+                  <div key={i} className="flex items-baseline justify-between bg-gray-50 rounded-xl px-3 py-2.5">
+                    <span className="text-sm text-gray-500">{spec.label}</span>
+                    <span className="text-sm font-semibold text-gray-900 ml-2">{spec.value}{spec.unit ? ` ${spec.unit}` : ''}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Fallback: legacy hardcoded fields if no specifications jsonb */}
+          {(!product.specifications || product.specifications.length === 0) && (product.capacity || product.constructionType || product.weight) && (
             <div className="grid grid-cols-3 gap-3 mb-6">
               {product.capacity && (
                 <div className="bg-blue-50 rounded-xl p-3 text-center">
@@ -382,7 +402,7 @@ export default function ProductPage() {
       {product.fullDescription && (
         <div className="mt-12 prose max-w-none">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Описание</h2>
-          <p className="text-gray-600 leading-relaxed">{product.fullDescription}</p>
+          <div className="text-gray-600 leading-relaxed prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: product.fullDescription }} />
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { BookOpen, HelpCircle, FileText, Star, ScrollText, Plus, Pencil, Trash2, X, ToggleLeft, ToggleRight, Search, ExternalLink } from 'lucide-react';
+import RichTextEditor from '@/components/RichTextEditor';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
@@ -89,7 +90,7 @@ function ArticlesTab() {
         <textarea value={form.excerpt} onChange={e => setForm((f: any) => ({ ...f, excerpt: e.target.value }))} className={inputCls + ' resize-none'} rows={2} />
       </F>
       <F label="Содержимое">
-        <textarea value={form.content} onChange={e => setForm((f: any) => ({ ...f, content: e.target.value }))} className={inputCls + ' resize-none'} rows={6} placeholder="Текст статьи..." />
+        <RichTextEditor value={form.content} onChange={v => setForm((f: any) => ({ ...f, content: v }))} placeholder="Текст статьи..." minHeight={220} />
       </F>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={form.active} onChange={e => setForm((f: any) => ({ ...f, active: e.target.checked }))} className="rounded" />
@@ -297,7 +298,7 @@ function PagesTab() {
         <F label="Meta Description (SEO)"><input value={form.metaDescription} onChange={e => setForm((f: any) => ({ ...f, metaDescription: e.target.value }))} className={inputCls} placeholder="Краткое описание для поисковиков (150–160 символов)" /></F>
       </div>
       <F label="Содержимое страницы">
-        <textarea value={form.content} onChange={e => setForm((f: any) => ({ ...f, content: e.target.value }))} className={inputCls + ' resize-y'} rows={12} placeholder="Введите текст страницы. Разделяйте абзацы пустой строкой." />
+        <RichTextEditor value={form.content} onChange={v => setForm((f: any) => ({ ...f, content: v }))} placeholder="Содержимое страницы..." minHeight={300} />
       </F>
       <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={form.active} onChange={e => setForm((f: any) => ({ ...f, active: e.target.checked }))} className="rounded" /><span>Страница активна (видна на сайте)</span></label>
     </div>

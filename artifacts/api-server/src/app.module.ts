@@ -20,6 +20,7 @@ import { NotificationsModule } from "./notifications/notifications.module.js";
 import { CustomersModule } from "./customers/customers.module.js";
 import { SalesModule } from "./sales/sales.module.js";
 import { MediaModule } from "./media/media.module.js";
+import { TemplatesModule } from "./templates/templates.module.js";
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { MediaModule } from "./media/media.module.js";
     CustomersModule,
     SalesModule,
     MediaModule,
+    TemplatesModule,
   ],
 })
 export class AppModule {}

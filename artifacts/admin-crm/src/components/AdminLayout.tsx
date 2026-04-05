@@ -6,7 +6,7 @@ import {
   LayoutDashboard, ShoppingBag, Package, Users, Tag, MapPin,
   MessageSquare, Settings, LogOut, Menu, X, User, Waves, ChevronRight,
   Store, FileText, HelpCircle, Star, Activity, Building2,
-  BookOpen, ScrollText, Image, ShoppingCart, CalendarCheck, Fish,
+  BookOpen, ScrollText, Image, ShoppingCart, CalendarCheck, Fish, Layers,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -45,6 +45,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItemDef[] }> = [
       { href: '/products', label: 'Товары аренды', icon: Tag },
       { href: '/sale-products', label: 'Товары продажи', icon: Store },
       { href: '/categories', label: 'Категории', icon: ScrollText },
+      { href: '/templates', label: 'Шаблоны', icon: Layers },
       { href: '/inventory', label: 'Инвентарь', icon: Package },
       { href: '/media', label: 'Медиафайлы', icon: Image },
     ],
