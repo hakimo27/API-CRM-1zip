@@ -6,8 +6,8 @@ import { Eye, EyeOff, Loader2, Lock } from 'lucide-react';
 export default function LoginPage() {
   const { login } = useAuth();
   const [, navigate] = useLocation();
-  const [email, setEmail] = useState('admin@kayak.ru');
-  const [password, setPassword] = useState('Admin123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -71,11 +71,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-4 p-3 bg-gray-50 rounded-xl text-xs text-gray-500">
-            <div className="font-medium mb-1">Тестовые данные:</div>
-            <div>admin@kayak.ru / Admin123!</div>
-            <div>manager@kayak.ru / Manager123!</div>
-          </div>
         </div>
       </div>
     </div>
