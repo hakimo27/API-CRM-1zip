@@ -3,6 +3,7 @@ import { api } from '@/lib/api';
 import { User, Search, Plus, Pencil, Trash2, Lock, ToggleLeft, ToggleRight, X, Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { PhoneInput } from '@/components/PhoneInput';
 
 const ROLE_BADGE: Record<string, string> = {
   superadmin: 'bg-purple-100 text-purple-700',
@@ -302,8 +303,7 @@ export default function UsersPage() {
             )}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Телефон">
-                <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                  className={inputCls} placeholder="+7 (999) 000-00-00" />
+                <PhoneInput value={form.phone} onChange={v => setForm(f => ({ ...f, phone: v }))} className={inputCls} />
               </Field>
               <Field label="Роль">
                 <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}

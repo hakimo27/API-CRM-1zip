@@ -25,8 +25,26 @@ export class ChatController {
 
   @Public()
   @Post("sessions")
-  createSession(@Body() body: { channel?: string; metadata?: Record<string, unknown> }) {
-    return this.chatService.getOrCreateSession(body.channel || "web", undefined, body.metadata);
+  createSession(
+    @Body() body: {
+      channel?: string;
+      customerName?: string;
+      customerPhone?: string;
+      customerEmail?: string;
+      metadata?: Record<string, unknown>;
+    }
+  ) {
+    const meta = {
+      ...(body.metadata || {}),
+      ...(body.customerPhone ? { phone: body.customerPhone } : {}),
+      ...(body.customerEmail ? { email: body.customerEmail } : {}),
+    };
+    return this.chatService.getOrCreateSession(
+      body.channel || "web",
+      undefined,
+      meta,
+      body.customerName,
+    );
   }
 
   @Get("sessions/:id")

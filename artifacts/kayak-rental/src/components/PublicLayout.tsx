@@ -38,12 +38,12 @@ function bool(v: unknown, fallback = false): boolean {
 function LogoMark({ name, logoUrl }: { name: string; logoUrl: string }) {
   if (logoUrl) {
     return (
-      <img src={logoUrl} alt={name} className="h-8 w-auto object-contain" />
+      <img src={logoUrl} alt={name} className="h-12 w-auto max-w-[160px] object-contain" />
     );
   }
   return (
     <div className="flex items-center gap-2">
-      <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+      <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
         <span className="text-white font-bold text-sm leading-none">БД</span>
       </div>
       <span className="font-bold text-lg text-gray-900">{name}</span>
@@ -55,12 +55,12 @@ function LogoMarkLight({ name, logoUrl, logoLightUrl }: { name: string; logoUrl:
   const src = logoLightUrl || logoUrl;
   if (src) {
     return (
-      <img src={src} alt={name} className="h-8 w-auto object-contain brightness-0 invert" />
+      <img src={src} alt={name} className="h-12 w-auto max-w-[160px] object-contain brightness-0 invert" />
     );
   }
   return (
     <div className="flex items-center gap-2">
-      <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
         <span className="text-white font-bold text-sm leading-none">БД</span>
       </div>
       <span className="font-bold text-lg text-white">{name}</span>
@@ -87,7 +87,12 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const copyright    = str(settings['general.copyright'], `Байдабаза ${new Date().getFullYear()}`);
   const logoUrl      = mediaUrl(str(settings['branding.logo_url']));
   const logoLightUrl = mediaUrl(str(settings['branding.logo_light_url']));
-  const chatEnabled  = bool(settings['chat.enabled'], true);
+  const chatEnabled      = bool(settings['chat.enabled'], true);
+  const chatGreeting     = str(settings['chat.greeting'] as string, 'Здравствуйте! Чем можем помочь?');
+  const chatPlaceholder  = str(settings['chat.placeholder'] as string, 'Напишите нам...');
+  const chatCollectName  = bool(settings['chat.collect_name'], false);
+  const chatCollectPhone = bool(settings['chat.collect_phone'], false);
+  const chatCollectEmail = bool(settings['chat.collect_email'], false);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -278,7 +283,16 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         </div>
       </footer>
 
-      {chatEnabled && <ChatWidget />}
+      {chatEnabled && (
+        <ChatWidget
+          enabled={chatEnabled}
+          greeting={chatGreeting}
+          placeholder={chatPlaceholder}
+          collectName={chatCollectName}
+          collectPhone={chatCollectPhone}
+          collectEmail={chatCollectEmail}
+        />
+      )}
     </div>
   );
 }

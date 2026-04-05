@@ -12,14 +12,14 @@ export default function ChatPage() {
   const { data: sessions = [], isLoading } = useQuery<any[]>({
     queryKey: ['chat-sessions'],
     queryFn: () => api.get('/chat/sessions'),
-    refetchInterval: 10_000,
+    refetchInterval: 8_000,
   });
 
   const { data: messages = [] } = useQuery<any[]>({
     queryKey: ['chat-messages', selectedSession?.id],
     queryFn: () => api.get(`/chat/sessions/${selectedSession.id}/messages`),
     enabled: !!selectedSession,
-    refetchInterval: 5_000,
+    refetchInterval: 4_000,
   });
 
   useEffect(() => {
@@ -28,10 +28,23 @@ export default function ChatPage() {
 
   const sendMessage = useMutation({
     mutationFn: (text: string) =>
-      api.post(`/chat/sessions/${selectedSession.id}/messages`, { text, senderType: 'operator' }),
+      api.post(`/chat/sessions/${selectedSession.id}/messages`, {
+        content: text,
+        sender: 'manager',
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['chat-messages', selectedSession?.id] });
+      qc.invalidateQueries({ queryKey: ['chat-sessions'] });
       setMessage('');
+    },
+  });
+
+  const closeSession = useMutation({
+    mutationFn: (id: number) =>
+      api.patch(`/chat/sessions/${id}/status`, { status: 'closed' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['chat-sessions'] });
+      setSelectedSession(null);
     },
   });
 
@@ -41,12 +54,25 @@ export default function ChatPage() {
     sendMessage.mutate(message.trim());
   };
 
+  function getLastMsg(session: any): string {
+    const meta = session.metadata as Record<string, unknown> | null;
+    const name = session.customerName || meta?.name as string || '';
+    const phone = (meta?.phone as string) || '';
+    if (name || phone) return [name, phone].filter(Boolean).join(' · ');
+    return 'Нет данных';
+  }
+
   return (
     <div className="flex h-[calc(100vh-8rem)] bg-white rounded-2xl border border-gray-100 overflow-hidden">
       {/* Sessions list */}
       <div className="w-72 border-r border-gray-100 flex flex-col flex-shrink-0">
-        <div className="px-4 py-4 border-b border-gray-100">
+        <div className="px-4 py-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="font-semibold text-gray-900">Чаты</h2>
+          {sessions.length > 0 && (
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+              {sessions.length}
+            </span>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
@@ -68,13 +94,16 @@ export default function ChatPage() {
                 }`}
               >
                 <div className="font-medium text-sm text-gray-900 truncate">
-                  {session.customerName || `Сессия ${session.id}`}
+                  {session.customerName || `Диалог #${session.id}`}
                 </div>
-                <div className="text-xs text-gray-400 mt-0.5">
-                  {session.lastMessage?.text?.slice(0, 40) || 'Нет сообщений'}...
+                <div className="text-xs text-gray-400 mt-0.5 truncate">
+                  {getLastMsg(session)}
                 </div>
-                <div className="text-xs text-gray-300 mt-1">
-                  {new Date(session.updatedAt || session.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                <div className="flex items-center gap-2 mt-1">
+                  <div className={`w-1.5 h-1.5 rounded-full ${session.status === 'open' ? 'bg-green-500' : 'bg-gray-300'}`} />
+                  <span className="text-xs text-gray-300">
+                    {new Date(session.updatedAt || session.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
               </button>
             ))
@@ -94,28 +123,39 @@ export default function ChatPage() {
         ) : (
           <>
             {/* Header */}
-            <div className="px-5 py-3.5 border-b border-gray-100 bg-gray-50">
-              <div className="font-semibold text-sm text-gray-900">
-                {selectedSession.customerName || `Сессия #${selectedSession.id}`}
+            <div className="px-5 py-3.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+              <div>
+                <div className="font-semibold text-sm text-gray-900">
+                  {selectedSession.customerName || `Диалог #${selectedSession.id}`}
+                </div>
+                <div className="text-xs text-gray-400">
+                  {(selectedSession.metadata as any)?.phone || (selectedSession.metadata as any)?.email || 'Нет контактов'}
+                </div>
               </div>
-              <div className="text-xs text-gray-400">
-                {selectedSession.customerPhone || 'Нет телефона'}
-              </div>
+              {selectedSession.status === 'open' && (
+                <button
+                  onClick={() => closeSession.mutate(selectedSession.id)}
+                  disabled={closeSession.isPending}
+                  className="text-xs text-gray-500 hover:text-red-600 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                >
+                  Закрыть диалог
+                </button>
+              )}
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
               {messages.length === 0 ? (
                 <div className="text-center py-8 text-gray-400 text-sm">Нет сообщений</div>
               ) : (
                 messages.map((msg: any) => {
-                  const isOp = msg.senderType === 'operator';
+                  const isOp = msg.sender === 'manager';
                   return (
                     <div key={msg.id} className={`flex ${isOp ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm ${
-                        isOp ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-gray-100 text-gray-900 rounded-bl-sm'
+                        isOp ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white text-gray-900 border border-gray-200 rounded-bl-sm'
                       }`}>
-                        <p>{msg.text}</p>
+                        <p>{msg.content}</p>
                         <div className={`text-xs mt-1 ${isOp ? 'text-blue-200' : 'text-gray-400'}`}>
                           {new Date(msg.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                         </div>
@@ -128,15 +168,20 @@ export default function ChatPage() {
             </div>
 
             {/* Input */}
-            <form onSubmit={handleSend} className="flex gap-2 p-4 border-t border-gray-100">
+            <form onSubmit={handleSend} className="flex gap-2 p-4 border-t border-gray-100 bg-white">
               <input
-                value={message} onChange={e => setMessage(e.target.value)}
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend(e as any)}
                 placeholder="Написать сообщение..."
-                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                disabled={selectedSession.status !== 'open'}
+                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:opacity-50 disabled:bg-gray-50"
               />
               <button
-                type="submit" disabled={!message.trim() || sendMessage.isPending}
-                className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50">
+                type="submit"
+                disabled={!message.trim() || sendMessage.isPending || selectedSession.status !== 'open'}
+                className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
                 {sendMessage.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </button>
             </form>

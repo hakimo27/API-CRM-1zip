@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Search, RefreshCw, ChevronRight, Plus, X, Save, CalendarCheck } from 'lucide-react';
+import { PhoneInput } from '@/components/PhoneInput';
 import { Link, useSearch } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 
@@ -160,8 +161,7 @@ function CreateBookingModal({ onClose }: { onClose: () => void }) {
               </F>
             </div>
             <F label="Телефон *">
-              <input value={form.contactPhone} onChange={e => sf('contactPhone', e.target.value)}
-                className={inputCls} placeholder="+7 999 000-00-00" />
+              <PhoneInput value={form.contactPhone} onChange={v => sf('contactPhone', v)} className={inputCls} />
             </F>
             <F label="Email">
               <input value={form.contactEmail} onChange={e => sf('contactEmail', e.target.value)}

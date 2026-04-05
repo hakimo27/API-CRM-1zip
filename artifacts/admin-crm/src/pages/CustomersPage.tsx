@@ -3,6 +3,7 @@ import { api } from '@/lib/api';
 import { Users, Search, Phone, Mail, ShoppingBag, Plus, Pencil, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { PhoneInput } from '@/components/PhoneInput';
 
 const inputCls = "w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm";
 
@@ -166,8 +167,7 @@ export default function CustomersPage() {
                   className={inputCls} placeholder="ivan@example.com" />
               </F>
               <F label="Телефон">
-                <input value={form.phone} onChange={e => setForm((f: any) => ({ ...f, phone: e.target.value }))}
-                  className={inputCls} placeholder="+7 (999) 000-00-00" />
+                <PhoneInput value={form.phone} onChange={v => setForm((f: any) => ({ ...f, phone: v }))} className={inputCls} />
               </F>
               <F label="Город">
                 <input value={form.city} onChange={e => setForm((f: any) => ({ ...f, city: e.target.value }))}

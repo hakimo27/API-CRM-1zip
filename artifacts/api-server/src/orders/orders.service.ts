@@ -15,6 +15,7 @@ import {
   productsTable,
   customersTable,
   inventoryUnitsTable,
+  settingsTable,
 } from "@workspace/db";
 import { AvailabilityService } from "../availability/availability.service.js";
 import { PricingService } from "../pricing/pricing.service.js";
@@ -163,8 +164,48 @@ export class OrdersService {
     return d;
   }
 
+  private async getDeliverySettings(): Promise<{ deliveryEnabled: boolean; pickupEnabled: boolean }> {
+    try {
+      const rows = await this.db
+        .select()
+        .from(settingsTable)
+        .where(
+          or(
+            eq(settingsTable.key, "delivery.enabled"),
+            eq(settingsTable.key, "delivery.self_pickup_enabled")
+          )
+        );
+      const map: Record<string, unknown> = {};
+      for (const row of rows) map[row.key] = row.value;
+      const toBool = (v: unknown, fallback: boolean) => {
+        if (v === null || v === undefined) return fallback;
+        if (typeof v === 'boolean') return v;
+        if (v === 'true' || v === 1) return true;
+        if (v === 'false' || v === 0) return false;
+        return fallback;
+      };
+      return {
+        deliveryEnabled: toBool(map["delivery.enabled"], true),
+        pickupEnabled: toBool(map["delivery.self_pickup_enabled"], true),
+      };
+    } catch {
+      return { deliveryEnabled: true, pickupEnabled: true };
+    }
+  }
+
   async create(dto: CreateOrderDto) {
     this.logger.log(`Creating order for ${dto.customerPhone}, items: ${dto.items.length}`);
+
+    // Validate delivery type against current settings
+    if (dto.deliveryType) {
+      const { deliveryEnabled, pickupEnabled } = await this.getDeliverySettings();
+      if (dto.deliveryType === "delivery" && !deliveryEnabled) {
+        throw new BadRequestException("Доставка в настоящее время недоступна. Выберите самовывоз.");
+      }
+      if (dto.deliveryType === "pickup" && !pickupEnabled) {
+        throw new BadRequestException("Самовывоз в настоящее время недоступен. Выберите доставку.");
+      }
+    }
 
     // Derive order-level dates: use dto.startDate/endDate if provided,
     // otherwise derive from item-level dates (min start, max end)

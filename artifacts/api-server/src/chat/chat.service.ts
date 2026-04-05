@@ -41,7 +41,7 @@ export class ChatService {
     return session;
   }
 
-  async getOrCreateSession(channel: string, externalId?: string, metadata?: Record<string, unknown>) {
+  async getOrCreateSession(channel: string, externalId?: string, metadata?: Record<string, unknown>, customerName?: string) {
     if (externalId) {
       const [existing] = await this.db
         .select()
@@ -57,13 +57,16 @@ export class ChatService {
       if (existing) return existing;
     }
 
+    const insertValues: any = {
+      channel: channel as any,
+      status: "open",
+      metadata: metadata || {},
+    };
+    if (customerName) insertValues.customerName = customerName;
+
     const [session] = await this.db
       .insert(chatSessionsTable)
-      .values({
-        channel: channel as any,
-        status: "open",
-        metadata: metadata || {},
-      })
+      .values(insertValues)
       .returning();
 
     this.businessNotifications?.notifyNewChat({

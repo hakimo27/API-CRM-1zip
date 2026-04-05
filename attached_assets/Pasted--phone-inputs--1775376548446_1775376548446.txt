@@ -1,0 +1,306 @@
+Исправь критические проблемы с чат-виджетом, настройками виджета, phone inputs, логотипом и контактами в header. Сейчас визуально часть вещей выглядит как будто работает, но по факту бизнес-логика и связка CRM → сайт сломаны.
+
+Нужно найти root cause и исправить это системно.
+
+==================================================
+1. ЧАТ ВИДИМО ОТПРАВЛЯЕТ СООБЩЕНИЯ, НО В АДМИНКЕ ИХ НЕТ
+==================================================
+
+Сейчас чат-виджет на сайте визуально позволяет отправить сообщение, но в админке диалогов/сообщений нет. Это значит, что UI делает вид, что все ок, но backend pipeline сломан.
+
+Нужно проверить весь flow:
+
+1. widget open
+2. create chat session
+3. send message
+4. persist chat session in DB
+5. persist chat message in DB
+6. fetch messages in admin
+7. admin inbox / chat list
+8. CRM dialog details page
+9. Telegram binding if enabled
+10. notification on new dialog / new message
+
+Проверь:
+- POST /api/chat/session
+- GET /api/chat/session/:id
+- GET /api/chat/session/:id/messages
+- POST /api/chat/session/:id/messages
+- сохранение в `chat_sessions`
+- сохранение в `chat_messages`
+- корректность `channel`
+- `sessionToken` / external id / localStorage binding
+- admin chat listing query
+- filters in admin that may hide messages
+- permissions
+- whether messages are only in local state and never persisted
+
+Нужно:
+- если пользователь отправил сообщение, оно реально сохраняется в БД
+- создается chat_session
+- сообщение видно в CRM
+- новый диалог виден в admin inbox
+- новые сообщения видны в admin inbox
+- если чат выключен — это отдельная логика, но если он включен, он должен работать реально
+
+Важно:
+- не должно быть fake success в виджете, если backend не сохранил сообщение
+- фронтенд должен показывать ошибку, если отправка реально не удалась
+
+==================================================
+2. НАСТРОЙКИ ВИДЖЕТА НЕ РАБОТАЮТ
+==================================================
+
+Сейчас настройки чат-виджета либо не подключены, либо не применяются на сайте.
+
+Нужно проверить и исправить:
+
+- chat_widget.enabled
+- chat_widget.show_on_site
+- chat_widget.show_on_homepage
+- chat_widget.show_on_product_pages
+- chat_widget.show_on_sale_pages
+- chat_widget.show_on_tour_pages
+- chat_widget.show_on_contacts
+- welcome_message
+- placeholder
+- offline_message
+- collect_name_enabled
+- collect_phone_enabled
+- collect_email_enabled
+- require_name
+- require_phone
+- require_email
+- working hours settings
+- autoresponder settings
+
+Проверь полный flow:
+1. settings save in CRM
+2. DB persistence
+3. public settings API
+4. widget config fetch
+5. frontend render conditions
+6. form fields visibility
+7. offline/live modes
+
+Нужно:
+- если чат выключен, он реально не рендерится
+- если чат включен, он реально рендерится
+- если включен сбор имени / телефона / email, поля реально появляются
+- если включен offline mode, он реально работает
+- если включен only on selected pages, это реально применяется
+
+==================================================
+3. ФОРМА ЧАТА НЕ ЗАПРАШИВАЕТ ДАННЫЕ, ХОТЯ ДОЛЖНА
+==================================================
+
+Сейчас форма в виджете не запрашивает имя / телефон / email, хотя это должно управляться настройками.
+
+Нужно:
+- реализовать форму pre-chat / lead capture / offline form
+- она должна работать в зависимости от настроек
+- должна поддерживать:
+  - имя
+  - телефон
+  - email
+- поле показывается только если включено
+- поле обязательное только если require=true
+- после отправки данные сохраняются в chat session / metadata / related customer lead
+
+Нужно:
+- если включен collect_name_enabled → показать поле имени
+- если включен collect_phone_enabled → показать поле телефона
+- если включен collect_email_enabled → показать поле email
+- если require_* = true → запретить отправку без заполнения
+- поля не должны быть “для галочки”, они должны реально участвовать в логике диалога
+
+==================================================
+4. PHONE INPUT НУЖНО НОРМАЛЬНО НАСТРОИТЬ: ФОРМАТ +7 (999) 000-00-00
+==================================================
+
+Сейчас телефон вводится слитно и неудобно. Нужен единый phone input component по всему проекту.
+
+Формат:
+- +7 (999) 000-00-00
+
+Нужно:
+1. единая маска телефона
+2. корректная вставка через paste
+3. корректное редактирование
+4. нормализованное хранение значения
+5. formatted display в UI
+6. отсутствие потери focus
+7. одинаковое поведение в CRM и на сайте
+
+Внедрить phone input везде, где есть номер:
+- chat widget form
+- offline form
+- settings contacts
+- customers
+- order create/edit
+- sale orders
+- tour bookings
+- branches
+- callback/contact forms
+- header contact edit blocks if any
+
+Важно:
+- не должно быть обычного text input без маски там, где это телефон
+- email поля не должны использовать phone mask
+- label и placeholder должны быть понятными и русскими
+
+==================================================
+5. ЛОГО ОЧЕНЬ МАЛЕНЬКОЕ
+==================================================
+
+Сейчас логотип отображается слишком маленьким и выглядит плохо.
+
+Нужно проверить и исправить:
+- размеры логотипа в header
+- размеры в mobile header
+- размеры в footer
+- размеры в CRM header, если там используется тот же branding
+- container sizing
+- image object-fit / max-height / width
+- retina / pixel density handling
+- light/dark versions if any
+
+Нужно:
+- сделать логотип визуально нормального размера
+- не растягивать его уродливо
+- не оставлять слишком маленьким
+- использовать branding settings asset реально
+- сделать аккуратные размеры для desktop и mobile
+
+Проверь:
+- public header
+- mobile menu/header
+- footer
+- CRM header if branding shared
+
+==================================================
+6. ТЕЛЕФОН ИЗ НАСТРОЕК НЕ ПЕРЕХОДИТ В HEADER / CONTACTS
+==================================================
+
+Сейчас телефон из Settings не прокидывается нормально:
+- в header
+- в contacts page
+- возможно в footer и другие блоки
+
+Это значит, что settings → public site mapping сломан.
+
+Нужно проверить:
+1. settings keys
+2. save in DB
+3. public settings API
+4. frontend mapping in header
+5. frontend mapping in contacts page
+6. fallback logic
+7. hardcoded numbers in components
+8. cache/revalidation
+
+Нужно:
+- изменить номер в settings
+- и убедиться, что он обновляется везде:
+  - header
+  - mobile menu
+  - contacts page
+  - footer
+  - CTA/contact blocks
+- если номер пустой, использовать понятный fallback
+- убрать старые hardcoded номера
+- не допускать, чтобы в одном месте номер был, а в другом пусто
+
+Также:
+- номер должен отображаться красиво:
+  - +7 (999) 000-00-00
+- tel: ссылка должна быть корректной
+
+==================================================
+7. НУЖНО ИСПРАВИТЬ ПОЛНЫЙ FLOW CRM SETTINGS -> PUBLIC SITE
+==================================================
+
+Похоже, проблема шире, чем один номер.
+
+Нужно провести аудит полного flow:
+- settings save
+- database persistence
+- public settings API
+- frontend consumption
+- cache invalidation / revalidation
+- rendering in components
+
+Проверить хотя бы для:
+- phone
+- email
+- logo
+- site title
+- widget settings
+- contact blocks
+
+Нельзя оставлять ситуацию:
+- в CRM значение меняется
+- а сайт не применяет его или применяет только частично
+
+==================================================
+8. УВЕДОМЛЕНИЯ ПО ЧАТУ ДОЛЖНЫ РАБОТАТЬ
+==================================================
+
+Раз чат должен создавать реальные диалоги, то по нему должны работать и уведомления.
+
+Нужно:
+- при новом диалоге уведомлять менеджера
+- при новом сообщении уведомлять менеджера
+- хотя бы в CRM/inbox/logs
+- если Telegram включен — отправлять в Telegram
+- если Telegram не настроен — хотя бы логировать/показывать в CRM
+
+События:
+- new chat session
+- new chat message
+
+Проверь:
+- notification dispatch
+- notification logs
+- CRM visibility
+- Telegram integration, if enabled
+
+==================================================
+9. ЧТО НУЖНО СДЕЛАТЬ ПРЯМО СЕЙЧАС
+==================================================
+
+1. Найди root cause, почему чат визуально отправляет сообщения, но их нет в CRM
+2. Почини реальный chat session/message persistence
+3. Почини admin inbox / диалоги
+4. Почини настройки виджета, чтобы они реально влияли на сайт
+5. Реализуй форму чата с name/phone/email по настройкам
+6. Внедри единый phone input с маской +7 (999) 000-00-00
+7. Исправь размер логотипа
+8. Исправь settings -> header/contacts phone flow
+9. Убери hardcoded/fallback разрывы
+10. Проверь уведомления по новому диалогу и новому сообщению
+11. Покажи, какие файлы изменены
+12. Покажи, какие routes/services/components/settings mappings изменены
+13. Покажи, как протестировано вручную
+
+==================================================
+10. ФОРМАТ ОТВЕТА
+==================================================
+
+Покажи:
+1. Почему чат “как будто отправлял”, но не сохранялся
+2. Как теперь реально создается chat session
+3. Как теперь реально сохраняются chat messages
+4. Как теперь это видно в CRM
+5. Почему настройки виджета не работали
+6. Как теперь работает форма имени/телефона/email
+7. Где внедрена единая маска телефона
+8. Как исправлен размер логотипа
+9. Почему телефон не попадал из settings в header/contacts
+10. Как исправлен settings -> public site flow
+11. Какие уведомления по чату теперь работают
+12. Какие файлы изменены
+13. Какие ручные тесты проведены
+
+Не делай заглушки.
+Сначала root cause audit, потом системное исправление.

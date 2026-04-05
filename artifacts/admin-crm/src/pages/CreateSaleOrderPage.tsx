@@ -7,6 +7,7 @@ import {
   ArrowLeft, Plus, Trash2, Search, Loader2, User, Package,
   MapPin, MessageSquare,
 } from 'lucide-react';
+import { PhoneInput } from '@/components/PhoneInput';
 
 const inputCls = "w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm";
 
@@ -173,8 +174,7 @@ export default function CreateSaleOrderPage() {
               placeholder="Иван Иванов" className={inputCls} />
           </F>
           <F label="Телефон">
-            <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
-              placeholder="+7 (999) 000-00-00" className={inputCls} />
+            <PhoneInput value={customerPhone} onChange={setCustomerPhone} className={inputCls} />
           </F>
           <F label="Email">
             <input value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}

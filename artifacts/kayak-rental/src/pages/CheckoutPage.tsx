@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Shield, ChevronLeft, Loader2, MapPin } from 'lucide-react';
+import { Shield, ChevronLeft, Loader2, MapPin, AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
+import { PhoneInput } from '@/components/PhoneInput';
+
+const API = '/api';
 
 interface Branch {
   id: number;
@@ -26,6 +29,23 @@ interface OrderForm {
   pickupBranchId: number | null;
 }
 
+function usePublicSettings() {
+  return useQuery<Record<string, unknown>>({
+    queryKey: ['public-settings'],
+    queryFn: () => fetch(`${API}/settings/public`).then(r => r.json()),
+    staleTime: 60 * 1000,
+  });
+}
+
+function boolSetting(settings: Record<string, unknown>, key: string, fallback: boolean): boolean {
+  const v = settings[key];
+  if (v === null || v === undefined) return fallback;
+  if (typeof v === 'boolean') return v;
+  if (v === 'true' || v === 1) return true;
+  if (v === 'false' || v === 0) return false;
+  return fallback;
+}
+
 export default function CheckoutPage() {
   const { items, totalAmount, clearCart } = useCart();
   const { user } = useAuth();
@@ -33,10 +53,16 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const { data: settings = {} } = usePublicSettings();
+  const deliveryEnabled   = boolSetting(settings, 'delivery.enabled', true);
+  const pickupEnabled     = boolSetting(settings, 'delivery.self_pickup_enabled', true);
+
   const { data: pickupPoints = [] } = useQuery<Branch[]>({
     queryKey: ['branches-pickup'],
     queryFn: () => api.get('/branches/pickup-points'),
   });
+
+  const defaultDeliveryType: 'pickup' | 'delivery' = pickupEnabled ? 'pickup' : 'delivery';
 
   const [form, setForm] = useState<OrderForm>({
     firstName: user?.firstName || '',
@@ -44,7 +70,7 @@ export default function CheckoutPage() {
     phone: '',
     email: user?.email || '',
     comment: '',
-    deliveryType: 'pickup',
+    deliveryType: defaultDeliveryType,
     deliveryAddress: '',
     pickupBranchId: null,
   });
@@ -52,11 +78,23 @@ export default function CheckoutPage() {
   const setField = <K extends keyof OrderForm>(field: K, value: OrderForm[K]) =>
     setForm(prev => ({ ...prev, [field]: value }));
 
+  const neitherEnabled = !deliveryEnabled && !pickupEnabled;
+
   const selectedBranch = pickupPoints.find(b => b.id === form.pickupBranchId) || pickupPoints[0] || null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (items.length === 0) return;
+    if (neitherEnabled) return;
+
+    if (!deliveryEnabled && form.deliveryType === 'delivery') {
+      setError('Доставка недоступна. Выберите самовывоз.');
+      return;
+    }
+    if (!pickupEnabled && form.deliveryType === 'pickup') {
+      setError('Самовывоз недоступен. Выберите доставку.');
+      return;
+    }
 
     if (form.deliveryType === 'delivery' && !form.deliveryAddress.trim()) {
       setError('Укажите адрес доставки');
@@ -115,6 +153,16 @@ export default function CheckoutPage() {
 
       <h1 className="text-2xl font-bold text-gray-900 mb-8">Оформление заказа</h1>
 
+      {neitherEnabled && (
+        <div className="mb-6 flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800">
+          <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <div>
+            <div className="font-medium">Способы получения временно недоступны</div>
+            <div className="text-sm mt-0.5">Пожалуйста, свяжитесь с нами по телефону для оформления заказа.</div>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
@@ -138,9 +186,12 @@ export default function CheckoutPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Телефон *</label>
-                  <input required type="tel" value={form.phone} onChange={e => setField('phone', e.target.value)}
+                  <PhoneInput
+                    required
+                    value={form.phone}
+                    onChange={v => setField('phone', v)}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="+7 (999) 000-00-00" />
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
@@ -151,84 +202,85 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Delivery */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-6">
-              <h2 className="font-semibold text-gray-900 mb-4">Способ получения</h2>
-              <div className="space-y-3 mb-4">
-                <label className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                  form.deliveryType === 'pickup' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
-                }`}>
-                  <input type="radio" name="delivery" value="pickup" checked={form.deliveryType === 'pickup'}
-                    onChange={() => setField('deliveryType', 'pickup')} className="mt-0.5" />
-                  <div>
-                    <div className="font-medium text-gray-900">Самовывоз</div>
-                    <div className="text-sm text-gray-500">
-                      {pickupPoints.length > 0
-                        ? `${pickupPoints.length} ${pickupPoints.length === 1 ? 'точка' : 'точки'} выдачи`
-                        : 'Заберите снаряжение самостоятельно'}
-                    </div>
-                  </div>
-                </label>
-
-                <label className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                  form.deliveryType === 'delivery' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
-                }`}>
-                  <input type="radio" name="delivery" value="delivery" checked={form.deliveryType === 'delivery'}
-                    onChange={() => setField('deliveryType', 'delivery')} className="mt-0.5" />
-                  <div>
-                    <div className="font-medium text-gray-900">Доставка</div>
-                    <div className="text-sm text-gray-500">Доставим к месту старта маршрута</div>
-                  </div>
-                </label>
-              </div>
-
-              {form.deliveryType === 'pickup' && pickupPoints.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Выберите точку выдачи:</p>
-                  {pickupPoints.map(branch => (
-                    <label key={branch.id} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                      (form.pickupBranchId ?? pickupPoints[0]?.id) === branch.id
-                        ? 'border-blue-400 bg-blue-50'
-                        : 'border-gray-100 hover:border-blue-200'
+            {/* Delivery — only rendered if at least one option is available */}
+            {!neitherEnabled && (
+              <div className="bg-white rounded-2xl border border-gray-100 p-6">
+                <h2 className="font-semibold text-gray-900 mb-4">Способ получения</h2>
+                <div className="space-y-3 mb-4">
+                  {pickupEnabled && (
+                    <label className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+                      form.deliveryType === 'pickup' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
                     }`}>
-                      <input
-                        type="radio"
-                        name="pickupBranch"
-                        checked={(form.pickupBranchId ?? pickupPoints[0]?.id) === branch.id}
-                        onChange={() => setField('pickupBranchId', branch.id)}
-                        className="mt-0.5"
-                      />
+                      <input type="radio" name="delivery" value="pickup" checked={form.deliveryType === 'pickup'}
+                        onChange={() => setField('deliveryType', 'pickup')} className="mt-0.5" />
                       <div>
-                        <div className="flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                          <span className="font-medium text-gray-900 text-sm">{branch.name}</span>
+                        <div className="font-medium text-gray-900">Самовывоз</div>
+                        <div className="text-sm text-gray-500">
+                          {pickupPoints.length > 0
+                            ? `${pickupPoints.length} ${pickupPoints.length === 1 ? 'точка' : 'точки'} выдачи`
+                            : 'Заберите снаряжение самостоятельно'}
                         </div>
-                        {branch.address && (
-                          <div className="text-xs text-gray-500 mt-0.5">{branch.address}{branch.city ? `, ${branch.city}` : ''}</div>
-                        )}
-                        {branch.workingHours && Object.keys(branch.workingHours).length > 0 && (
-                          <div className="text-xs text-gray-400 mt-0.5">
-                            {Object.entries(branch.workingHours).slice(0, 2).map(([d, h]) => `${d}: ${h}`).join(' · ')}
-                          </div>
-                        )}
                       </div>
                     </label>
-                  ))}
-                </div>
-              )}
+                  )}
 
-              {form.deliveryType === 'delivery' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Адрес доставки *</label>
-                  <input
-                    required={form.deliveryType === 'delivery'}
-                    value={form.deliveryAddress}
-                    onChange={e => setField('deliveryAddress', e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="Введите адрес или место старта маршрута" />
+                  {deliveryEnabled && (
+                    <label className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+                      form.deliveryType === 'delivery' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
+                    }`}>
+                      <input type="radio" name="delivery" value="delivery" checked={form.deliveryType === 'delivery'}
+                        onChange={() => setField('deliveryType', 'delivery')} className="mt-0.5" />
+                      <div>
+                        <div className="font-medium text-gray-900">Доставка</div>
+                        <div className="text-sm text-gray-500">Доставим к месту старта маршрута</div>
+                      </div>
+                    </label>
+                  )}
                 </div>
-              )}
-            </div>
+
+                {form.deliveryType === 'pickup' && pickupPoints.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Выберите точку выдачи:</p>
+                    {pickupPoints.map(branch => (
+                      <label key={branch.id} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                        (form.pickupBranchId ?? pickupPoints[0]?.id) === branch.id
+                          ? 'border-blue-400 bg-blue-50'
+                          : 'border-gray-100 hover:border-blue-200'
+                      }`}>
+                        <input
+                          type="radio"
+                          name="pickupBranch"
+                          checked={(form.pickupBranchId ?? pickupPoints[0]?.id) === branch.id}
+                          onChange={() => setField('pickupBranchId', branch.id)}
+                          className="mt-0.5"
+                        />
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                            <span className="font-medium text-gray-900 text-sm">{branch.name}</span>
+                          </div>
+                          {branch.address && (
+                            <div className="text-xs text-gray-500 mt-0.5">{branch.address}{branch.city ? `, ${branch.city}` : ''}</div>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                {form.deliveryType === 'delivery' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Адрес доставки *</label>
+                    <input
+                      required={form.deliveryType === 'delivery'}
+                      value={form.deliveryAddress}
+                      onChange={e => setField('deliveryAddress', e.target.value)}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="Введите адрес или место старта маршрута" />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Comment */}
             <div className="bg-white rounded-2xl border border-gray-100 p-6">
@@ -267,11 +319,12 @@ export default function CheckoutPage() {
               )}
 
               <button
-                type="submit" disabled={loading}
+                type="submit"
+                disabled={loading || neitherEnabled}
                 className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                {loading ? 'Оформляем...' : 'Оформить заказ'}
+                {loading ? 'Оформляем...' : neitherEnabled ? 'Недоступно' : 'Оформить заказ'}
               </button>
 
               <div className="flex items-center gap-2 mt-3 text-xs text-gray-500">
