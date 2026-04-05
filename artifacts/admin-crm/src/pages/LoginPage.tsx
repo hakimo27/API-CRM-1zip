@@ -49,7 +49,7 @@ export default function LoginPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
               <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="admin@kayak.ru" autoComplete="email" />
+                placeholder="admin@example.com" autoComplete="email" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Пароль</label>
