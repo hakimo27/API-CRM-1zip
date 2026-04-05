@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Байдабаза — Health Check Script
-# Usage: sh deploy/healthcheck.sh
+# Usage: bash deploy/healthcheck.sh
 # =============================================================================
 set -euo pipefail
 

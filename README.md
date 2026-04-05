@@ -121,7 +121,7 @@ echo "SESSION_SECRET=$(openssl rand -hex 32)"
 ### Шаг 3 — Запустить установку
 
 ```bash
-sh deploy/install.sh
+bash deploy/install.sh
 ```
 
 Всё. Скрипт самостоятельно:
@@ -190,7 +190,7 @@ docker compose run --rm --no-deps api \
   sh -c "cd /app && pnpm --filter @workspace/db run push"
 
 # Вручную (если нужно)
-sh deploy/init-db.sh
+bash deploy/init-db.sh
 ```
 
 ---
@@ -200,14 +200,14 @@ sh deploy/init-db.sh
 ### Создать backup
 
 ```bash
-sh deploy/backup-db.sh
+bash deploy/backup-db.sh
 # Файл сохраняется в ./backups/
 ```
 
 ### Восстановить из backup
 
 ```bash
-sh deploy/restore-db.sh backups/backup_20250101_120000.sql.gz
+bash deploy/restore-db.sh backups/backup_20250101_120000.sql.gz
 ```
 
 ### Перенести загруженные файлы
@@ -300,19 +300,19 @@ location /api/ {
 
 ```bash
 # Первая установка
-sh deploy/install.sh
+bash deploy/install.sh
 
 # Обновление (после изменений в коде)
-sh deploy/update.sh
+bash deploy/update.sh
 
 # Резервная копия БД
-sh deploy/backup-db.sh
+bash deploy/backup-db.sh
 
 # Восстановление из бэкапа
-sh deploy/restore-db.sh backups/backup_DATE.sql.gz
+bash deploy/restore-db.sh backups/backup_DATE.sql.gz
 
 # Проверка состояния
-sh deploy/healthcheck.sh
+bash deploy/healthcheck.sh
 ```
 
 ### Docker
@@ -414,7 +414,7 @@ docker compose down && docker compose up -d
 - [ ] Скопированы в `docker/ssl/`
 
 ### Установка
-- [ ] `sh deploy/install.sh` выполнен без ошибок
+- [ ] `bash deploy/install.sh` выполнен без ошибок
 - [ ] `curl https://domain.ru/api/auth/healthz` возвращает 200
 - [ ] Публичный сайт открывается
 - [ ] CRM открывается на `/crm`

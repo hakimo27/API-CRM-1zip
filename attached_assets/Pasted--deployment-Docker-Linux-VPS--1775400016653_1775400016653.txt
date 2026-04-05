@@ -1,0 +1,210 @@
+Перепиши deployment и Docker-конфигурацию проекта под нормальный Linux/VPS сервер. Сейчас сборка и деплой должны быть ориентированы не на Replit-окружение, а на обычный Linux-сервер, где проект будет запускаться через Docker Compose.
+
+Важно:
+- у меня обычный Linux/VPS
+- нужно убрать/обойти проблемы, связанные с alpine/musl
+- нужно привести deploy к стабильному production-сценарию для Linux
+- нужно, чтобы проект нормально собирался и запускался на сервере
+
+==================================================
+1. ПЕРЕПИСАТЬ DOCKERFILES ПОД LINUX VPS
+==================================================
+
+Сейчас нужно проверить и переписать:
+- Dockerfile.web
+- Dockerfile.admin
+- Dockerfile.api
+- другие Dockerfiles, если есть
+
+Главная задача:
+- builder stages должны быть совместимы с Linux VPS
+- не использовать проблемные alpine/musl сценарии там, где из-за этого ломается Rollup/Vite build
+
+Нужно:
+1. Найти builder stages для frontend/admin
+2. Если там используется alpine image:
+   - заменить builder stage на Debian slim / bookworm slim
+3. Использовать стабильные base images, например:
+   - node:20-bookworm-slim
+   - node:20-slim
+4. Оставить runtime image отдельно, если это нужно для оптимизации
+5. Убедиться, что Rollup/Vite/Pnpm нормально работают в Linux-сборке
+
+==================================================
+2. УБРАТЬ ПРОБЛЕМУ С ROLLUP MUSL
+==================================================
+
+Сейчас сборка падает на ошибке вида:
+- Cannot find module @rollup/rollup-linux-x64-musl
+
+Нужно исправить это системно.
+
+Проверить:
+- base image builder stage
+- pnpm install
+- optional dependencies
+- no-optional flags
+- monorepo install flow
+- vite/rollup build
+
+Нужно:
+- уйти от musl-проблем
+- использовать Linux-friendly gnu/slim build environment
+- не оставлять костыли, если можно нормально решить базовым образом
+
+==================================================
+3. ПЕРЕПИСАТЬ DEPLOY ПОД ОБЫЧНЫЙ LINUX
+==================================================
+
+Нужно, чтобы deploy был ориентирован на обычный VPS.
+
+Проверить и переписать:
+- docker-compose.yml
+- docker/nginx.conf
+- deploy/install.sh
+- deploy/update.sh
+- deploy/init-db.sh
+- deploy/backup-db.sh
+- deploy/restore-db.sh
+- README_DEPLOY.md
+
+Нужно:
+- убрать replit-specific зависимости
+- убрать replit-only paths/assumptions
+- сделать нормальный Linux/VPS flow
+- использовать bash, а не sh, если в скриптах есть bash-специфика
+
+==================================================
+4. ВСЕ DEPLOY SCRIPTS ДОЛЖНЫ БЫТЬ ПОД BASH
+==================================================
+
+Сейчас скрипты должны корректно запускаться на Linux.
+
+Нужно:
+1. во все deploy scripts добавить shebang:
+   - #!/usr/bin/env bash
+2. проверить:
+   - deploy/install.sh
+   - deploy/update.sh
+   - deploy/init-db.sh
+   - deploy/backup-db.sh
+   - deploy/restore-db.sh
+   - deploy/healthcheck.sh, если есть
+3. убрать несовместимость с `sh`
+4. в инструкциях заменить:
+   - sh deploy/install.sh
+   на
+   - bash deploy/install.sh
+
+==================================================
+5. ПРОВЕРИТЬ MONOREPO INSTALL/BUILD FLOW НА LINUX
+==================================================
+
+Так как проект workspace/monorepo, нужно проверить:
+
+- package.json
+- pnpm-lock.yaml
+- pnpm-workspace.yaml
+- artifacts/*
+- lib/*
+- filters for web/admin/api
+
+Нужно:
+- убедиться, что все нужные папки копируются в Docker build context
+- pnpm install выполняется корректно
+- build для:
+  - @workspace/kayak-rental
+  - @workspace/admin-crm
+  - backend/api
+работает на Linux без ручных костылей
+
+==================================================
+6. ПОДГОТОВИТЬ ЧИСТЫЙ LINUX DEPLOY FLOW
+==================================================
+
+Я должен мочь на Linux-сервере сделать:
+
+1. загрузить проект
+2. скопировать `.env.example` в `.env`
+3. заполнить `.env`
+4. выполнить:
+   - bash deploy/install.sh
+5. получить рабочий проект
+
+Install script должен:
+- проверить docker/docker compose
+- поднять postgres
+- поднять redis
+- поднять api
+- поднять web
+- поднять admin
+- поднять nginx
+- применить миграции
+- выполнить bootstrap при необходимости
+
+==================================================
+7. FIRST INSTALL И SUPERADMIN ЧЕРЕЗ ENV ДОЛЖНЫ СОХРАНИТЬСЯ
+==================================================
+
+Если уже добавлены env-флаги для first install, они должны работать и на Linux.
+
+Нужно поддержать:
+- APP_FIRST_INSTALL
+- APP_RUN_MIGRATIONS
+- APP_RUN_SEED
+- APP_RUN_DEMO_SEED
+- BOOTSTRAP_SUPERADMIN_CREATE
+- BOOTSTRAP_SUPERADMIN_EMAIL
+- BOOTSTRAP_SUPERADMIN_PASSWORD
+- BOOTSTRAP_SUPERADMIN_FIRST_NAME
+- BOOTSTRAP_SUPERADMIN_LAST_NAME
+- BOOTSTRAP_SUPERADMIN_PHONE
+
+Install script должен это реально использовать.
+
+==================================================
+8. ОБНОВИТЬ README ПОД LINUX VPS
+==================================================
+
+README и README_DEPLOY должны быть переписаны именно под Linux/VPS.
+
+Нужно:
+- убрать replit-специфику
+- описать Linux-сценарий
+- дать точные команды
+- указать, что deploy scripts запускать через bash
+- указать, как пересобрать контейнеры после правок:
+  - docker compose build --no-cache
+  - docker compose up -d
+
+==================================================
+9. ЧТО НУЖНО СДЕЛАТЬ ПРЯМО СЕЙЧАС
+==================================================
+
+1. Переписать Dockerfile.web под Linux-friendly builder
+2. Переписать Dockerfile.admin под Linux-friendly builder
+3. Проверить Dockerfile.api
+4. Убрать проблему с Rollup musl
+5. Привести deploy scripts к bash
+6. Переписать README/README_DEPLOY под Linux VPS
+7. Проверить monorepo build flow
+8. Проверить install/update scripts
+9. Показать, какие файлы изменены
+10. Показать, какие команды теперь использовать на Linux
+
+==================================================
+10. ФОРМАТ ОТВЕТА
+==================================================
+
+Покажи:
+1. Какие Dockerfiles были переписаны
+2. Какие base images теперь используются
+3. Почему раньше Linux build падал
+4. Как исправлена проблема с Rollup musl
+5. Какие deploy scripts переведены на bash
+6. Как теперь выглядит Linux deployment flow
+7. Какие файлы изменены
+8. Какие команды мне запускать на сервере
+
+Не отвечай общими словами.
+Сначала проведи аудит docker/deploy setup, потом перепиши его под обычный Linux VPS.

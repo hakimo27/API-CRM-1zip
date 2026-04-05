@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Байдабаза — Production Install Script
-# Usage: sh deploy/install.sh
+# Usage: bash deploy/install.sh
 # =============================================================================
 set -euo pipefail
 
@@ -36,7 +36,7 @@ if [ ! -f ".env" ]; then
   if [ -f ".env.example" ]; then
     warn ".env not found. Copying .env.example → .env"
     cp .env.example .env
-    warn "Edit .env with your real values, then re-run: sh deploy/install.sh"
+    warn "Edit .env with your real values, then re-run: bash deploy/install.sh"
     exit 1
   else
     error ".env file not found. Create it from .env.example"
@@ -94,7 +94,7 @@ success "Redis is ready"
 if [ "${APP_RUN_MIGRATIONS:-true}" = "true" ]; then
   info "Running database migrations..."
   docker compose run --rm --no-deps api \
-    sh -c "cd /app && pnpm --filter @workspace/db run push" \
+    bash -c "cd /app && pnpm --filter @workspace/db run push" \
     || error "Migrations failed. Check logs above."
   success "Migrations applied"
 else

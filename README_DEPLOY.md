@@ -33,7 +33,7 @@ cp .env.example .env
 nano .env          # заполнить обязательные переменные (см. ниже)
 
 # 3. Запустить автоустановщик
-sh deploy/install.sh
+bash deploy/install.sh
 ```
 
 Скрипт автоматически:
@@ -115,7 +115,7 @@ BOOTSTRAP_SUPERADMIN_PHONE=
 ## Обновление
 
 ```bash
-sh deploy/update.sh
+bash deploy/update.sh
 ```
 
 Скрипт:
@@ -130,10 +130,10 @@ sh deploy/update.sh
 
 ```bash
 # Создать бэкап (сохраняется в ./backups/)
-sh deploy/backup-db.sh
+bash deploy/backup-db.sh
 
 # Восстановить из бэкапа
-sh deploy/restore-db.sh ./backups/backup_20250101_120000.sql.gz
+bash deploy/restore-db.sh ./backups/backup_20250101_120000.sql.gz
 ```
 
 ---
@@ -142,7 +142,7 @@ sh deploy/restore-db.sh ./backups/backup_20250101_120000.sql.gz
 
 ```bash
 # Статус всех сервисов
-sh deploy/healthcheck.sh
+bash deploy/healthcheck.sh
 
 # Логи сервиса
 docker compose logs -f api
@@ -280,7 +280,7 @@ docker compose exec postgres psql -U baydabaza baydabaza
 **Как полностью сбросить и переустановить?**
 ```bash
 docker compose down -v    # ВНИМАНИЕ: удалит все данные!
-sh deploy/install.sh
+bash deploy/install.sh
 ```
 
 **API не запускается?**

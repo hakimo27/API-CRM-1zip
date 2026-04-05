@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Байдабаза — Update Script
-# Usage: sh deploy/update.sh
+# Usage: bash deploy/update.sh
 # Rebuilds and restarts all services, applies migrations, keeps data intact.
 # =============================================================================
 set -euo pipefail
@@ -28,7 +28,7 @@ echo ""
 
 # ── 1. Backup database before update ─────────────────────────────────────────
 info "Creating pre-update database backup..."
-sh deploy/backup-db.sh "pre_update_$(date +%Y%m%d_%H%M%S).sql" || warn "Backup skipped (non-fatal)"
+bash deploy/backup-db.sh "pre_update_$(date +%Y%m%d_%H%M%S).sql" || warn "Backup skipped (non-fatal)"
 
 # ── 2. Rebuild images ─────────────────────────────────────────────────────────
 info "Rebuilding Docker images..."
@@ -38,7 +38,7 @@ success "Images rebuilt"
 # ── 3. Apply migrations (before restarting services) ─────────────────────────
 info "Applying database migrations..."
 docker compose run --rm --no-deps api \
-  sh -c "cd /app && pnpm --filter @workspace/db run push" \
+  bash -c "cd /app && pnpm --filter @workspace/db run push" \
   || error "Migrations failed. Update aborted."
 success "Migrations applied"
 
