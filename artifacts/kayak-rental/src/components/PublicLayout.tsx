@@ -42,7 +42,7 @@ function LogoMark({ name, logoUrl }: { name: string; logoUrl: string }) {
       <img
         src={logoUrl}
         alt={name}
-        style={{ height: '95px', width: 'auto', maxWidth: '420px', objectFit: 'contain' }}
+        style={{ height: '75px', width: 'auto', maxWidth: '420px', objectFit: 'contain' }}
       />
     );
   }
@@ -63,7 +63,7 @@ function LogoMarkLight({ name, logoUrl, logoLightUrl }: { name: string; logoUrl:
       <img
         src={src}
         alt={name}
-        style={{ height: '95px', width: 'auto', maxWidth: '420px', objectFit: 'contain' }}
+        style={{ height: '75px', width: 'auto', maxWidth: '420px', objectFit: 'contain' }}
       />
     );
   }
