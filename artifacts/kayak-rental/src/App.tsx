@@ -20,6 +20,7 @@ import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
 import AccountPage from '@/pages/AccountPage';
 import ToursPage from '@/pages/ToursPage';
+import TourDetailPage from '@/pages/TourDetailPage';
 import InfoPage from '@/pages/InfoPage';
 import NotFound from '@/pages/not-found';
 
@@ -48,6 +49,7 @@ function AppRoutes() {
         <Route path="/account" component={AccountPage} />
         <Route path="/account/orders" component={AccountPage} />
         <Route path="/tours" component={ToursPage} />
+        <Route path="/tours/:slug" component={TourDetailPage} />
         <Route path="/info/:slug" component={InfoPage} />
         <Route component={NotFound} />
       </Switch>

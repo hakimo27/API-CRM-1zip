@@ -11,11 +11,30 @@ const CONDITION_COLOR: Record<string, string> = {
   excellent: 'text-green-600', good: 'text-blue-600', fair: 'text-yellow-600', poor: 'text-red-600',
 };
 const STATUS_LABELS: Record<string, string> = {
-  available: 'Доступен', rented: 'В аренде', maintenance: 'Обслуживание', written_off: 'Списан',
+  available:      'Доступен',
+  busy:           'Занят',
+  reserved:       'Зарезервирован',
+  checked:        'Проверяется',
+  ready_for_issue:'Готов к выдаче',
+  in_repair:      'В ремонте',
+  incomplete:     'Некомплект',
+  incoming:       'Поступление',
+  written_off:    'Списан',
+  rented:         'В аренде',
+  maintenance:    'Обслуживание',
 };
 const STATUS_BADGE: Record<string, string> = {
-  available: 'bg-green-100 text-green-700', rented: 'bg-blue-100 text-blue-700',
-  maintenance: 'bg-yellow-100 text-yellow-700', written_off: 'bg-red-100 text-red-600',
+  available:       'bg-green-100 text-green-700',
+  busy:            'bg-blue-100 text-blue-700',
+  reserved:        'bg-indigo-100 text-indigo-700',
+  checked:         'bg-cyan-100 text-cyan-700',
+  ready_for_issue: 'bg-teal-100 text-teal-700',
+  in_repair:       'bg-orange-100 text-orange-700',
+  incomplete:      'bg-amber-100 text-amber-700',
+  incoming:        'bg-violet-100 text-violet-700',
+  written_off:     'bg-red-100 text-red-600',
+  rented:          'bg-blue-100 text-blue-700',
+  maintenance:     'bg-yellow-100 text-yellow-700',
 };
 
 const inputCls = "w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm";
@@ -99,11 +118,16 @@ export default function InventoryPage() {
     return matchStatus && matchSearch;
   });
 
+  const UNAVAILABLE_STATUSES = ['in_repair', 'incomplete', 'written_off', 'incoming'];
+  const ACTIVE_STATUSES = ['busy', 'reserved', 'checked', 'ready_for_issue', 'rented'];
   const stats = {
-    total: inventory.length,
-    available: inventory.filter(i => i.status === 'available').length,
-    rented: inventory.filter(i => i.status === 'rented').length,
-    maintenance: inventory.filter(i => i.status === 'maintenance').length,
+    total:       inventory.length,
+    available:   inventory.filter(i => i.status === 'available').length,
+    active:      inventory.filter(i => ACTIVE_STATUSES.includes(i.status)).length,
+    in_repair:   inventory.filter(i => i.status === 'in_repair').length,
+    incomplete:  inventory.filter(i => i.status === 'incomplete').length,
+    written_off: inventory.filter(i => i.status === 'written_off').length,
+    other:       inventory.filter(i => ['maintenance', 'incoming', 'checked'].includes(i.status)).length,
   };
 
   const sf = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
@@ -212,17 +236,23 @@ export default function InventoryPage() {
   return (
     <div className="space-y-4">
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         {[
-          { label: 'Всего единиц', value: stats.total, color: 'bg-gray-100 text-gray-700' },
-          { label: 'Доступно', value: stats.available, color: 'bg-green-100 text-green-700' },
-          { label: 'В аренде', value: stats.rented, color: 'bg-blue-100 text-blue-700' },
-          { label: 'Обслуживание', value: stats.maintenance, color: 'bg-yellow-100 text-yellow-700' },
+          { label: 'Всего единиц',  value: stats.total,       color: 'bg-gray-100 text-gray-700',    filter: '' },
+          { label: 'Доступно',      value: stats.available,   color: 'bg-green-100 text-green-700',  filter: 'available' },
+          { label: 'В работе',      value: stats.active,      color: 'bg-blue-100 text-blue-700',    filter: '' },
+          { label: 'В ремонте',     value: stats.in_repair,   color: 'bg-orange-100 text-orange-700',filter: 'in_repair' },
+          { label: 'Некомплект',    value: stats.incomplete,  color: 'bg-amber-100 text-amber-700',  filter: 'incomplete' },
+          { label: 'Списано',       value: stats.written_off, color: 'bg-red-100 text-red-600',      filter: 'written_off' },
         ].map(s => (
-          <div key={s.label} className={`rounded-2xl p-4 text-center ${s.color}`}>
+          <button
+            key={s.label}
+            onClick={() => s.filter !== undefined && setStatusFilter(s.filter === statusFilter ? '' : s.filter)}
+            className={`rounded-2xl p-4 text-center transition-all ${s.color} ${s.filter && s.filter === statusFilter ? 'ring-2 ring-offset-1 ring-gray-400' : ''} ${s.filter ? 'cursor-pointer hover:opacity-90' : ''}`}
+          >
             <div className="text-2xl font-bold">{s.value}</div>
-            <div className="text-sm mt-1">{s.label}</div>
-          </div>
+            <div className="text-xs mt-1 font-medium">{s.label}</div>
+          </button>
         ))}
       </div>
 
