@@ -54,6 +54,12 @@ async function tryRefresh(): Promise<string | null> {
   }
 }
 
+function clearSessionAndNotify() {
+  localStorage.removeItem('crm_token');
+  localStorage.removeItem('crm_refresh_token');
+  window.dispatchEvent(new Event('crm:logout'));
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -65,14 +71,20 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
 
   if (res.status === 401) {
+    // No token was sent → this is a real authentication error (e.g. wrong password).
+    // Surface the server's error message directly instead of claiming session expired.
+    if (!token) {
+      const err = await res.json().catch(() => ({ message: 'Ошибка авторизации' }));
+      throw new Error(err.message || 'Ошибка авторизации');
+    }
+
+    // We sent a token but got 401 → it expired. Try to silently refresh.
     const newToken = await tryRefresh();
     if (newToken) {
       const retryHeaders = { ...headers, 'Authorization': `Bearer ${newToken}` };
       const retryRes = await fetch(`${BASE}${path}`, { ...options, headers: retryHeaders });
       if (retryRes.status === 401) {
-        localStorage.removeItem('crm_token');
-        localStorage.removeItem('crm_refresh_token');
-        window.dispatchEvent(new Event('crm:logout'));
+        clearSessionAndNotify();
         throw new Error('Сессия истекла');
       }
       if (!retryRes.ok) {
@@ -83,9 +95,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       return retryRes.json();
     }
 
-    localStorage.removeItem('crm_token');
-    localStorage.removeItem('crm_refresh_token');
-    window.dispatchEvent(new Event('crm:logout'));
+    // Refresh also failed — session is truly expired.
+    clearSessionAndNotify();
     throw new Error('Сессия истекла');
   }
 
@@ -112,6 +123,10 @@ export const api = {
     if (token) headers['Authorization'] = `Bearer ${token}`;
     const res = await fetch(`${BASE}${path}`, { method: 'POST', headers, body: formData });
     if (res.status === 401) {
+      if (!token) {
+        const err = await res.json().catch(() => ({ message: 'Ошибка авторизации' }));
+        throw new Error(err.message || 'Ошибка авторизации');
+      }
       const newToken = await tryRefresh();
       if (newToken) {
         const retryHeaders: Record<string, string> = { 'Authorization': `Bearer ${newToken}` };
@@ -122,9 +137,7 @@ export const api = {
         }
         return retryRes.json();
       }
-      localStorage.removeItem('crm_token');
-      localStorage.removeItem('crm_refresh_token');
-      window.dispatchEvent(new Event('crm:logout'));
+      clearSessionAndNotify();
       throw new Error('Сессия истекла');
     }
     if (!res.ok) {

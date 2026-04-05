@@ -47,6 +47,7 @@ export class AuthController {
     return this.authService.refresh(dto.refreshToken, userAgent, ip);
   }
 
+  @Public()
   @Post("logout")
   @HttpCode(HttpStatus.OK)
   logout(@Body() dto: RefreshTokenDto) {
@@ -75,7 +76,7 @@ export class AuthController {
 
   @Get("me")
   me(@CurrentUser() user: any) {
-    return user;
+    return this.authService.findById(user.id);
   }
 
   @Get("healthz")

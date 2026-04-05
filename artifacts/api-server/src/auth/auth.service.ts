@@ -180,6 +180,16 @@ export class AuthService {
     return { user: this.sanitizeUser(user), ...tokens };
   }
 
+  async findById(userId: number) {
+    const [user] = await this.db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+    if (!user) throw new UnauthorizedException("Пользователь не найден");
+    return this.sanitizeUser(user);
+  }
+
   async logout(refreshToken: string) {
     try {
       const tokenHash = await this.hashToken(refreshToken);

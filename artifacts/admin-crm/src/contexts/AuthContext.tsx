@@ -31,15 +31,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         })
         .catch(() => {
+          // /auth/me failed even after refresh attempt — clear everything
           localStorage.removeItem('crm_token');
           localStorage.removeItem('crm_refresh_token');
         })
         .finally(() => setLoading(false));
-    } else setLoading(false);
+    } else {
+      setLoading(false);
+    }
 
-    const h = () => setUser(null);
-    window.addEventListener('crm:logout', h);
-    return () => window.removeEventListener('crm:logout', h);
+    // Listen for session expiry events fired by the API interceptor
+    const handleLogout = () => setUser(null);
+    window.addEventListener('crm:logout', handleLogout);
+    return () => window.removeEventListener('crm:logout', handleLogout);
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -55,12 +59,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    const token = localStorage.getItem('crm_token');
     const refreshToken = localStorage.getItem('crm_refresh_token');
+
+    // Clear local state immediately for instant UX
+    setUser(null);
     localStorage.removeItem('crm_token');
     localStorage.removeItem('crm_refresh_token');
-    setUser(null);
+
+    // Revoke the refresh token on the server using raw fetch (bypasses the API interceptor
+    // so we don't trigger a spurious "session expired" event after already clearing tokens).
     if (refreshToken) {
-      api.post('/auth/logout', { refreshToken }).catch(() => {});
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ refreshToken }),
+      }).catch(() => {});
     }
   };
 
