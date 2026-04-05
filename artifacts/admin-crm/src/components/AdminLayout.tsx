@@ -7,12 +7,13 @@ import {
   MessageSquare, Settings, LogOut, Menu, X, User, Waves, ChevronRight,
   Store, FileText, HelpCircle, Star, Activity, Building2,
   BookOpen, ScrollText, Image, ShoppingCart, CalendarCheck, Fish, Layers,
-  Bell, BellOff, Download,
+  BellRing, Download,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { usePushSubscription } from '@/hooks/usePushSubscription';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
+import { NotificationDropdown } from './NotificationDropdown';
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: 'Супер-администратор',
@@ -87,15 +88,6 @@ const NAV_GROUPS: Array<{ label: string; items: NavItemDef[] }> = [
   },
 ];
 
-function Badge({ count }: { count: number }) {
-  if (!count) return null;
-  return (
-    <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 leading-none flex-shrink-0">
-      {count > 99 ? '99+' : count}
-    </span>
-  );
-}
-
 function NavItem({ item, counts }: { item: NavItemDef; counts: Record<string, number> }) {
   const [location] = useLocation();
   const active = item.exact ? location === item.href : location.startsWith(item.href);
@@ -135,7 +127,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { toast } = useToast();
   const qc = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { status: pushStatus, subscribe: subscribePush } = usePushSubscription();
   const { canInstall, install: installPwa } = usePwaInstall();
 
@@ -149,33 +141,69 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     staleTime: 4_000,
   });
 
-  // Track previous unreadChats count and show toast when it increases
-  const prevUnreadChatsRef = useRef<number | null>(null);
+  // Track previous counts for all event types
+  const prevCounts = useRef<Record<string, number> | null>(null);
   const [newChatAlert, setNewChatAlert] = useState(false);
 
   useEffect(() => {
-    const current = counts.unreadChats || 0;
-    const prev = prevUnreadChatsRef.current;
+    const prev = prevCounts.current;
 
-    if (prev !== null && current > prev) {
-      const diff = current - prev;
-      toast({
-        title: diff === 1 ? '💬 Новый чат' : `💬 ${diff} новых чата`,
-        description: 'Клиент написал в чат — откройте раздел, чтобы ответить.',
-      });
-      setNewChatAlert(true);
-      // Also invalidate the chat sessions list so ChatPage refreshes immediately
-      qc.invalidateQueries({ queryKey: ['chat-sessions'] });
+    if (prev !== null) {
+      const newChats = (counts.unreadChats || 0) - (prev.unreadChats || 0);
+      const newOrders = (counts.newOrders || 0) - (prev.newOrders || 0);
+      const newSaleOrders = (counts.newSaleOrders || 0) - (prev.newSaleOrders || 0);
+      const newBookings = (counts.pendingBookings || 0) - (prev.pendingBookings || 0);
+
+      if (newChats > 0) {
+        const plural = newChats === 1 ? 'новое сообщение' : `${newChats} новых сообщений`;
+        toast({
+          title: 'Новое сообщение в чате',
+          description: `Клиент написал — ${plural} ждут ответа`,
+          notificationType: 'chat',
+          onClick: () => navigate('/chat'),
+        });
+        setNewChatAlert(true);
+        qc.invalidateQueries({ queryKey: ['chat-sessions'] });
+        qc.invalidateQueries({ queryKey: ['notifications-recent'] });
+      }
+
+      if (newOrders > 0) {
+        toast({
+          title: newOrders === 1 ? 'Новый заказ аренды' : `${newOrders} новых заказа аренды`,
+          description: 'Требует обработки — нажмите для перехода',
+          notificationType: 'order',
+          onClick: () => navigate('/orders'),
+        });
+        qc.invalidateQueries({ queryKey: ['notifications-recent'] });
+      }
+
+      if (newSaleOrders > 0) {
+        toast({
+          title: newSaleOrders === 1 ? 'Новый заказ магазина' : `${newSaleOrders} новых заказа`,
+          description: 'Требует обработки — нажмите для перехода',
+          notificationType: 'sale-order',
+          onClick: () => navigate('/sale-orders'),
+        });
+        qc.invalidateQueries({ queryKey: ['notifications-recent'] });
+      }
+
+      if (newBookings > 0) {
+        toast({
+          title: newBookings === 1 ? 'Новое бронирование тура' : `${newBookings} новых бронирований`,
+          description: 'Требует подтверждения — нажмите для перехода',
+          notificationType: 'booking',
+          onClick: () => navigate('/tour-bookings'),
+        });
+        qc.invalidateQueries({ queryKey: ['notifications-recent'] });
+      }
     }
 
-    prevUnreadChatsRef.current = current;
-  }, [counts.unreadChats]);
+    prevCounts.current = { ...counts };
+  }, [counts.unreadChats, counts.newOrders, counts.newSaleOrders, counts.pendingBookings]);
 
-  // Clear the new-chat alert when manager navigates to the chat page
+  // Clear chat alert when on chat page
   useEffect(() => {
-    if (location.startsWith('/chat')) {
-      setNewChatAlert(false);
-    }
+    if (location.startsWith('/chat')) setNewChatAlert(false);
   }, [location]);
 
   return (
@@ -249,7 +277,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Menu className="w-5 h-5" />
           </button>
           <h1 className="text-base font-semibold text-gray-900 truncate">{currentPage?.label || 'CRM'}</h1>
-          <div className="ml-auto flex items-center gap-2">
+
+          <div className="ml-auto flex items-center gap-1.5">
+            {/* New chat alert badge */}
             {newChatAlert && !location.startsWith('/chat') && (
               <Link href="/chat"
                 className="flex items-center gap-1.5 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded-full transition-colors animate-pulse">
@@ -257,11 +287,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 Новый чат
               </Link>
             )}
+
+            {/* Notification dropdown (bell with unread counter) */}
+            <NotificationDropdown />
+
+            {/* PWA install button */}
             {canInstall && (
               <button
                 onClick={async () => {
                   const ok = await installPwa();
-                  if (ok) toast({ title: 'Приложение установлено', description: 'CRM теперь доступен на рабочем столе' });
+                  if (ok) toast({
+                    title: 'Приложение установлено',
+                    description: 'Байдабаза CRM доступна на рабочем столе',
+                    notificationType: 'success',
+                  });
                 }}
                 title="Установить приложение"
                 className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -269,27 +308,38 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Download className="w-4 h-4" />
               </button>
             )}
+
+            {/* Push subscription button — uses BellRing to distinguish from notification bell */}
             {pushStatus === 'idle' && (
               <button
                 onClick={async () => {
                   const ok = await subscribePush();
-                  if (ok) toast({ title: '🔔 Уведомления включены', description: 'Вы будете получать push-уведомления о новых событиях' });
-                  else toast({ title: 'Уведомления не включены', description: 'Разрешите уведомления в браузере', variant: 'destructive' });
+                  if (ok) toast({
+                    title: 'Push-уведомления включены',
+                    description: 'Получайте уведомления даже при закрытой вкладке',
+                    notificationType: 'success',
+                  });
+                  else toast({
+                    title: 'Уведомления не включены',
+                    description: 'Разрешите уведомления в настройках браузера',
+                    notificationType: 'warning',
+                  });
                 }}
                 title="Включить push-уведомления"
-                className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
               >
-                <Bell className="w-4 h-4" />
+                <BellRing className="w-4 h-4" />
               </button>
             )}
             {pushStatus === 'subscribed' && (
               <span title="Push-уведомления включены" className="p-1.5 text-green-500">
-                <Bell className="w-4 h-4" />
+                <BellRing className="w-4 h-4" />
               </span>
             )}
+
             <a href="/" target="_blank" rel="noopener noreferrer"
               className="text-xs text-gray-500 hover:text-blue-600 transition-colors hidden sm:block">
-              → Публичный сайт
+              → Сайт
             </a>
           </div>
         </header>

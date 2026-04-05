@@ -69,7 +69,7 @@ export default function TourDetailPage() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
     onError: (e: any) => {
-      toast({ title: 'Ошибка', description: e?.message || 'Не удалось оформить бронирование', variant: 'destructive' });
+      toast({ title: 'Ошибка', description: e?.message || 'Не удалось оформить бронирование', toastVariant: 'error' });
     },
   });
 

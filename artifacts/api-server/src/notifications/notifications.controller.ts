@@ -57,6 +57,17 @@ export class NotificationsController {
     };
   }
 
+  @Get("recent")
+  async getRecent(@Query("limit") limit = "30") {
+    const rows = await this.db
+      .select()
+      .from(notificationLogsTable)
+      .where(eq(notificationLogsTable.channel, "system"))
+      .orderBy(desc(notificationLogsTable.createdAt))
+      .limit(Math.min(Number(limit) || 30, 100));
+    return rows;
+  }
+
   @Post("test-email")
   @Roles("superadmin", "admin")
   async testEmail(@Body() body: { email: string }) {
