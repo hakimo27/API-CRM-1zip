@@ -106,52 +106,88 @@ export default function CustomersPage() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-12 text-gray-400"><Users className="w-12 h-12 mx-auto mb-3 opacity-30" /><p>Клиенты не найдены</p></div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead><tr className="bg-gray-50">
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Клиент</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Контакт</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Источник</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Заказы</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Сумма</th>
-                <th className="px-6 py-3"></th>
-              </tr></thead>
-              <tbody className="divide-y divide-gray-50">
-                {filtered.map((c: any) => (
-                  <tr key={c.id} className="hover:bg-gray-50/50">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center font-bold text-blue-700 text-sm flex-shrink-0">
-                          {(c.firstName || '?')[0].toUpperCase()}
+          <>
+            {/* Mobile cards */}
+            <div className="sm:hidden divide-y divide-gray-50">
+              {filtered.map((c: any) => (
+                <div key={c.id} className="p-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center font-bold text-blue-700 text-sm flex-shrink-0">
+                      {(c.firstName || '?')[0].toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-sm text-gray-900">{c.firstName} {c.lastName}</div>
+                      <div className="text-xs text-gray-400">{c.city || SOURCE_LABELS[c.source] || c.source || ''}</div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-sm font-semibold text-gray-900">{Number(c.totalSpent || 0).toLocaleString('ru-RU')} ₽</div>
+                      <div className="text-xs text-gray-400">{c.ordersCount || 0} заказов</div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500 space-y-0.5 mb-3">
+                    {c.phone && <div>{c.phone}</div>}
+                    {c.email && <div className="truncate">{c.email}</div>}
+                  </div>
+                  <div className="flex gap-2">
+                    <Link href={`/customers/${c.id}`}
+                      className="flex-1 flex items-center justify-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-2 rounded-lg transition-colors">
+                      <ExternalLink className="w-3.5 h-3.5" /> Карточка
+                    </Link>
+                    <button onClick={() => openEdit(c)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-gray-200"><Pencil className="w-4 h-4" /></button>
+                    <button onClick={() => setDeletingId(c.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full">
+                <thead><tr className="bg-gray-50">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Клиент</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Контакт</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Источник</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Заказы</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Сумма</th>
+                  <th className="px-6 py-3"></th>
+                </tr></thead>
+                <tbody className="divide-y divide-gray-50">
+                  {filtered.map((c: any) => (
+                    <tr key={c.id} className="hover:bg-gray-50/50">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center font-bold text-blue-700 text-sm flex-shrink-0">
+                            {(c.firstName || '?')[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-medium text-sm text-gray-900">{c.firstName} {c.lastName}</div>
+                            {c.city && <div className="text-xs text-gray-400">{c.city}</div>}
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-medium text-sm text-gray-900">{c.firstName} {c.lastName}</div>
-                          {c.city && <div className="text-xs text-gray-400">{c.city}</div>}
+                      </td>
+                      <td className="px-6 py-4">
+                        {c.email && <div className="flex items-center gap-1.5 text-xs text-gray-600 mb-1"><Mail className="w-3.5 h-3.5" />{c.email}</div>}
+                        {c.phone && <div className="flex items-center gap-1.5 text-xs text-gray-600"><Phone className="w-3.5 h-3.5" />{c.phone}</div>}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{SOURCE_LABELS[c.source] || c.source || '—'}</td>
+                      <td className="px-6 py-4"><div className="flex items-center gap-1.5 text-sm text-gray-700"><ShoppingBag className="w-4 h-4 text-gray-400" />{c.ordersCount || 0}</div></td>
+                      <td className="px-6 py-4 text-sm font-medium">{Number(c.totalSpent || 0).toLocaleString('ru-RU')} ₽</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1 justify-end">
+                          <Link href={`/customers/${c.id}`}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                            <ExternalLink className="w-3.5 h-3.5" /> Карточка
+                          </Link>
+                          <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Pencil className="w-4 h-4" /></button>
+                          <button onClick={() => setDeletingId(c.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {c.email && <div className="flex items-center gap-1.5 text-xs text-gray-600 mb-1"><Mail className="w-3.5 h-3.5" />{c.email}</div>}
-                      {c.phone && <div className="flex items-center gap-1.5 text-xs text-gray-600"><Phone className="w-3.5 h-3.5" />{c.phone}</div>}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{SOURCE_LABELS[c.source] || c.source || '—'}</td>
-                    <td className="px-6 py-4"><div className="flex items-center gap-1.5 text-sm text-gray-700"><ShoppingBag className="w-4 h-4 text-gray-400" />{c.ordersCount || 0}</div></td>
-                    <td className="px-6 py-4 text-sm font-medium">{Number(c.totalSpent || 0).toLocaleString('ru-RU')} ₽</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1 justify-end">
-                        <Link href={`/customers/${c.id}`}
-                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
-                          <ExternalLink className="w-3.5 h-3.5" /> Карточка
-                        </Link>
-                        <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Pencil className="w-4 h-4" /></button>
-                        <button onClick={() => setDeletingId(c.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

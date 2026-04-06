@@ -161,18 +161,6 @@ function FaqTab() {
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => api.patch(`/content/faqs/${id}`, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['faqs'] }); toast({ title: 'Сохранено' }); setEditing(null); }, onError: (e: any) => toast({ title: 'Ошибка', description: e.message, variant: 'destructive' }) });
   const deleteMut = useMutation({ mutationFn: (id: number) => api.delete(`/content/faqs/${id}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ['faqs'] }); toast({ title: 'Удалено' }); setDeletingId(null); }, onError: (e: any) => toast({ title: 'Ошибка', description: e.message, variant: 'destructive' }) });
 
-  const FaqForm = () => (
-    <div className="px-6 py-4 space-y-4">
-      <F label="Вопрос *"><input value={form.question} onChange={e => setForm((f: any) => ({ ...f, question: e.target.value }))} className={inputCls} /></F>
-      <F label="Ответ *"><textarea value={form.answer} onChange={e => setForm((f: any) => ({ ...f, answer: e.target.value }))} className={inputCls + ' resize-none'} rows={4} /></F>
-      <div className="grid grid-cols-2 gap-3">
-        <F label="Категория"><input value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))} className={inputCls} placeholder="general" /></F>
-        <F label="Порядок"><input type="number" value={form.sortOrder} onChange={e => setForm((f: any) => ({ ...f, sortOrder: +e.target.value }))} className={inputCls} /></F>
-      </div>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm((f: any) => ({ ...f, active: e.target.checked }))} className="rounded" />Активен</label>
-    </div>
-  );
-
   return (
     <>
       <div className="flex justify-end mb-4">
@@ -187,7 +175,7 @@ function FaqTab() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
                     <div className="font-medium text-sm text-gray-900 mb-1">{f.question}</div>
-                    <div className="text-xs text-gray-500 line-clamp-2">{f.answer}</div>
+                    <div className="text-xs text-gray-500 line-clamp-2">{f.answer?.replace(/<[^>]*>/g, '') || ''}</div>
                     <div className="text-xs text-gray-400 mt-1">Категория: {f.category}</div>
                   </div>
                   <div className="flex gap-1 flex-shrink-0">
@@ -201,7 +189,15 @@ function FaqTab() {
         )}
       {(creating || editing) && (
         <Modal title={creating ? 'Новый вопрос' : 'Редактировать вопрос'} onClose={() => { setCreating(false); setEditing(null); }}>
-          <FaqForm />
+          <div className="px-6 py-4 space-y-4">
+            <F label="Вопрос *"><input autoFocus value={form.question} onChange={e => setForm((f: any) => ({ ...f, question: e.target.value }))} className={inputCls} /></F>
+            <F label="Ответ *"><textarea value={form.answer} onChange={e => setForm((f: any) => ({ ...f, answer: e.target.value })) } className={inputCls + ' resize-none'} rows={5} /></F>
+            <div className="grid grid-cols-2 gap-3">
+              <F label="Категория"><input value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))} className={inputCls} placeholder="general" /></F>
+              <F label="Порядок"><input type="number" value={form.sortOrder} onChange={e => setForm((f: any) => ({ ...f, sortOrder: +e.target.value }))} className={inputCls} /></F>
+            </div>
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none"><input type="checkbox" checked={form.active} onChange={e => setForm((f: any) => ({ ...f, active: e.target.checked }))} className="rounded" />Активен</label>
+          </div>
           <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
             <button onClick={() => { setCreating(false); setEditing(null); }} className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium">Отмена</button>
             <button onClick={() => creating ? createMut.mutate(form) : updateMut.mutate({ id: editing.id, data: form })} disabled={createMut.isPending || updateMut.isPending} className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{(createMut.isPending || updateMut.isPending) ? 'Сохранение...' : 'Сохранить'}</button>

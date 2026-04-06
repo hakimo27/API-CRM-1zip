@@ -3,6 +3,8 @@ import { useParams, Link, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useSaleCart } from '@/contexts/SaleCartContext';
+import { RichContent } from '@/components/RichContent';
+import { useSeoMeta } from '@/hooks/useSeoMeta';
 import {
   ChevronLeft, Package, CheckCircle, ShoppingBag, AlertCircle,
   ShoppingCart, Zap, Minus, Plus, Check,
@@ -69,6 +71,13 @@ export default function SaleProductPage() {
     queryFn: () => api.get(`/sales/products/${slug}`),
     enabled: !!slug,
     retry: false,
+  });
+
+  useSeoMeta({
+    title: product?.metaTitle || product?.name,
+    description: product?.metaDescription || (product?.description ? product.description.replace(/<[^>]*>/g, '').slice(0, 160).trim() : undefined),
+    image: (product as any)?.images?.[0]?.url || undefined,
+    type: 'product',
   });
 
   if (isLoading) {
@@ -298,11 +307,7 @@ export default function SaleProductPage() {
         {product.description && (
           <div>
             <h2 className="text-xl font-bold text-gray-900 mb-4">Описание</h2>
-            <div className="prose prose-gray max-w-none">
-              {product.description.split('\n').map((line, i) => (
-                <p key={i} className="text-gray-700 mb-2 leading-relaxed">{line}</p>
-              ))}
-            </div>
+            <RichContent html={product.description} />
           </div>
         )}
 

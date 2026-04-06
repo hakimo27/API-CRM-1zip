@@ -6,6 +6,8 @@ import { api } from '@/lib/api';
 import { useCart } from '@/contexts/CartContext';
 import { differenceInCalendarDays, addDays, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { RichContent } from '@/components/RichContent';
+import { useSeoMeta } from '@/hooks/useSeoMeta';
 
 interface Tariff {
   id: number; type: string; label: string;
@@ -93,6 +95,13 @@ export default function ProductPage() {
 
   const isAvailable = !availability || availability.available;
   const canAddToCart = !!selectedTariff && datesValid && isAvailable;
+
+  useSeoMeta({
+    title: product?.name,
+    description: product?.shortDescription || undefined,
+    image: product?.images?.[0]?.url || undefined,
+    type: 'product',
+  });
 
   const handleAddToCart = () => {
     if (!product || !selectedTariff || !canAddToCart) return;
@@ -400,9 +409,11 @@ export default function ProductPage() {
 
       {/* Full Description */}
       {product.fullDescription && (
-        <div className="mt-12 prose max-w-none">
+        <div className="mt-12">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Описание</h2>
-          <div className="text-gray-600 leading-relaxed prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: product.fullDescription }} />
+          <div className="bg-white rounded-2xl border border-gray-100 p-6">
+            <RichContent html={product.fullDescription} />
+          </div>
         </div>
       )}
 

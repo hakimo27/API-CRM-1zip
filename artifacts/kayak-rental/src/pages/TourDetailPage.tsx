@@ -4,6 +4,8 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { PhoneInput } from '@/components/PhoneInput';
 import { useToast } from '@/hooks/use-toast';
+import { RichContent } from '@/components/RichContent';
+import { useSeoMeta } from '@/hooks/useSeoMeta';
 import {
   Calendar, Users, Clock, ChevronLeft, CheckCircle,
   MapPin, AlertCircle, ChevronDown, Loader2, Mountain,
@@ -79,6 +81,13 @@ export default function TourDetailPage() {
   const price = selectedDate ? Number(selectedDate.price) : Number(tour?.basePrice ?? 0);
   const deposit = selectedDate ? Number(selectedDate.depositAmount ?? 0) : Number(tour?.depositAmount ?? 0);
   const totalAmount = price * participants;
+
+  useSeoMeta({
+    title: tour?.metaTitle || tour?.title,
+    description: tour?.metaDescription || (tour?.description ? tour.description.replace(/<[^>]*>/g, '').slice(0, 160).trim() : undefined),
+    image: tour?.mainImage || undefined,
+    type: 'product',
+  });
 
   function handleBook(e: React.FormEvent) {
     e.preventDefault();
@@ -209,7 +218,7 @@ export default function TourDetailPage() {
           {tour.description && (
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-2">О туре</h2>
-              <p className="text-gray-600 leading-relaxed whitespace-pre-line">{tour.description}</p>
+              <RichContent html={tour.description} className="text-gray-600" />
             </div>
           )}
 
@@ -217,8 +226,8 @@ export default function TourDetailPage() {
           {tour.program && (
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-2">Программа</h2>
-              <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-                {tour.program}
+              <div className="bg-gray-50 rounded-xl p-4">
+                <RichContent html={tour.program} className="text-sm text-gray-700" />
               </div>
             </div>
           )}

@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Phone, Mail, Clock, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
+import { RichContent } from '@/components/RichContent';
+import { useSeoMeta } from '@/hooks/useSeoMeta';
 
 const FALLBACK_STATIC: Record<string, { title: string; content: string }> = {
   about: {
@@ -92,7 +94,9 @@ function FaqAccordion({ faqs }: { faqs: Array<{ id: number; question: string; an
                     : <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />}
                 </button>
                 {openId === faq.id && (
-                  <div className="px-5 pb-4 text-gray-600 leading-relaxed bg-gray-50">{faq.answer}</div>
+                  <div className="px-5 pb-4 bg-gray-50">
+                    <RichContent html={faq.answer} className="text-gray-600 text-sm" />
+                  </div>
                 )}
               </div>
             ))}
@@ -240,6 +244,19 @@ export default function InfoPage() {
     enabled: slug === 'contacts',
   });
 
+  const staticFallback = FALLBACK_STATIC[slug || ''];
+
+  const seoTitle =
+    slug === 'faq' ? 'Вопросы и ответы' :
+    slug === 'contacts' ? 'Контакты' :
+    page?.metaTitle || page?.title || staticFallback?.title || slug;
+
+  const seoDesc =
+    page?.metaDescription ||
+    (page?.content ? page.content.replace(/<[^>]*>/g, '').slice(0, 160).trim() : undefined);
+
+  useSeoMeta({ title: seoTitle, description: seoDesc });
+
   if (slug === 'faq') {
     return (
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
@@ -272,29 +289,19 @@ export default function InfoPage() {
     );
   }
 
-  const staticFallback = FALLBACK_STATIC[slug || ''];
   const title = page?.title || staticFallback?.title || slug;
   const content = page?.content || staticFallback?.content || '';
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
-      {page?.metaTitle && <title>{page.metaTitle}</title>}
       <h1 className="text-3xl font-bold text-gray-900 mb-8">{title}</h1>
-      <div className="bg-white rounded-2xl border border-gray-100 p-8 prose prose-gray max-w-none">
+      <div className="bg-white rounded-2xl border border-gray-100 p-8">
         {pageLoading && !staticFallback ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent" />
           </div>
         ) : content ? (
-          content.split('\n\n').map((paragraph: string, i: number) => (
-            <div key={i} className="mb-4">
-              {paragraph.split('\n').map((line: string, j: number) => (
-                <p key={j} className={`${line.startsWith('•') ? 'ml-4' : ''} text-gray-700 leading-relaxed`}>
-                  {line}
-                </p>
-              ))}
-            </div>
-          ))
+          <RichContent html={content} />
         ) : (
           <div className="text-center py-8">
             <p className="text-gray-500 mb-4">Страница не найдена</p>
