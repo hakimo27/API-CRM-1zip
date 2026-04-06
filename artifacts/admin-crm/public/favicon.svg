@@ -1,3 +1,41 @@
-<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="180" height="180" rx="36" fill="#FF3C00"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF5A1F"/>
+      <stop offset="100%" stop-color="#FF3C00"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#000000" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <g transform="translate(256 250) scale(1.14) translate(-256 -256)" filter="url(#shadow)">
+    <g fill="#FFFFFF">
+      <rect x="248" y="100" width="16" height="220" rx="8"/>
+      <path d="M256 78
+               C228 82, 207 101, 201 129
+               C222 128, 242 116, 256 94
+               C270 116, 290 128, 311 129
+               C305 101, 284 82, 256 78Z"/>
+    </g>
+
+    <path d="M112 318
+             C148 286, 197 266, 256 260
+             C315 266, 364 286, 400 318
+             C360 340, 312 354, 256 358
+             C200 354, 152 340, 112 318Z"
+          fill="#FFFFFF"/>
+
+    <path d="M172 317
+             C198 297, 226 285, 256 282
+             C286 285, 314 297, 340 317
+             C313 327, 285 333, 256 335
+             C227 333, 199 327, 172 317Z"
+          fill="#FF6C3E"/>
+
+    <path d="M116 372 C150 362, 182 360, 212 366" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" opacity="0.95"/>
+    <path d="M300 366 C332 360, 364 362, 396 372" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" opacity="0.95"/>
+  </g>
 </svg>
