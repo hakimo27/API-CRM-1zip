@@ -1,7 +1,14 @@
 import { Injectable, NotFoundException, Inject } from "@nestjs/common";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, or, ilike } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
-import { customersTable, ordersTable, chatSessionsTable } from "@workspace/db";
+import {
+  customersTable,
+  ordersTable,
+  chatSessionsTable,
+  saleOrdersTable,
+  tourBookingsTable,
+  usersTable,
+} from "@workspace/db";
 
 type DrizzleDb = typeof import("@workspace/db").db;
 
@@ -26,6 +33,7 @@ export class CustomersService {
       customers = customers.filter(
         (c) =>
           c.name.toLowerCase().includes(s) ||
+          (c.lastName || "").toLowerCase().includes(s) ||
           (c.phone || "").includes(s) ||
           (c.email || "").toLowerCase().includes(s)
       );
@@ -43,6 +51,7 @@ export class CustomersService {
 
     if (!customer) throw new NotFoundException("Клиент не найден");
 
+    // Rental orders are linked directly by customerId
     const [orders, chatSessions] = await Promise.all([
       this.db
         .select()
@@ -58,11 +67,62 @@ export class CustomersService {
         .limit(10),
     ]);
 
-    const totalOrders = orders.length;
-    const totalRevenue = orders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
-    const activeOrders = orders.filter(o => !["cancelled", "completed", "refunded"].includes(o.status)).length;
+    // Sale orders: find user with matching email, then load their sale orders.
+    // Also try matching deliveryAddress->phone via raw approach if needed.
+    let saleOrders: any[] = [];
+    let tourBookings: any[] = [];
 
-    return { ...customer, orders, chatSessions, stats: { totalOrders, totalRevenue, activeOrders } };
+    if (customer.email) {
+      const [linkedUser] = await this.db
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(eq(usersTable.email, customer.email))
+        .limit(1);
+
+      if (linkedUser) {
+        [saleOrders, tourBookings] = await Promise.all([
+          this.db
+            .select()
+            .from(saleOrdersTable)
+            .where(eq(saleOrdersTable.userId, linkedUser.id))
+            .orderBy(desc(saleOrdersTable.createdAt))
+            .limit(20),
+          this.db
+            .select()
+            .from(tourBookingsTable)
+            .where(eq(tourBookingsTable.userId, linkedUser.id))
+            .orderBy(desc(tourBookingsTable.createdAt))
+            .limit(20),
+        ]);
+      }
+    }
+
+    // Tour bookings also store contactPhone directly — match by phone as fallback
+    if (tourBookings.length === 0 && customer.phone) {
+      tourBookings = await this.db
+        .select()
+        .from(tourBookingsTable)
+        .where(eq(tourBookingsTable.contactPhone, customer.phone))
+        .orderBy(desc(tourBookingsTable.createdAt))
+        .limit(20);
+    }
+
+    const totalOrders = orders.length;
+    const totalRevenue =
+      orders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0) +
+      saleOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+    const activeOrders = orders.filter(
+      (o) => !["cancelled", "completed", "refunded"].includes(o.status)
+    ).length;
+
+    return {
+      ...customer,
+      orders,
+      saleOrders,
+      tourBookings,
+      chatSessions,
+      stats: { totalOrders: totalOrders + saleOrders.length + tourBookings.length, totalRevenue, activeOrders },
+    };
   }
 
   async findByPhone(phone: string) {

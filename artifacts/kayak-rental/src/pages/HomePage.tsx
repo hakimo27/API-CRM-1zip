@@ -280,7 +280,7 @@ export default function HomePage() {
                       <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                     ))}
                   </div>
-                  <p className="text-gray-700 text-sm mb-4">{r.text}</p>
+                  <p className="text-gray-700 text-sm mb-4">{r.text?.replace(/<[^>]*>/g, '') || ''}</p>
                   <div className="font-medium text-gray-900 text-sm">{r.authorName}</div>
                 </div>
               ))}

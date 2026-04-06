@@ -138,6 +138,12 @@ export class ContentController {
     return this.contentService.createReview(body);
   }
 
+  @Post("reviews/admin")
+  @Roles("admin", "manager")
+  createReviewAdmin(@Body() body: any) {
+    return this.contentService.createReviewAdmin(body);
+  }
+
   @Patch("reviews/:id")
   @Roles("admin", "manager")
   updateReview(@Param("id", ParseIntPipe) id: number, @Body() body: any) {

@@ -140,7 +140,7 @@ export class ContentService {
       .select()
       .from(reviewsTable)
       .where(onlyApproved ? eq(reviewsTable.status, "approved") : undefined)
-      .orderBy(desc(reviewsTable.createdAt));
+      .orderBy(asc(reviewsTable.sortOrder), desc(reviewsTable.createdAt));
     if (featured !== undefined) reviews = reviews.filter((r) => r.featured === featured);
     return reviews;
   }
@@ -149,6 +149,18 @@ export class ContentService {
     const [created] = await this.db
       .insert(reviewsTable)
       .values({ ...data, status: "pending", published: false })
+      .returning();
+    return created;
+  }
+
+  async createReviewAdmin(data: any) {
+    const [created] = await this.db
+      .insert(reviewsTable)
+      .values({
+        ...data,
+        status: data.status ?? "pending",
+        published: data.published ?? false,
+      })
       .returning();
     return created;
   }

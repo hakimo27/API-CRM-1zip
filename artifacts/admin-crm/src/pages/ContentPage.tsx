@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { BookOpen, HelpCircle, FileText, Star, ScrollText, Plus, Pencil, Trash2, X, ToggleLeft, ToggleRight, Search, ExternalLink } from 'lucide-react';
+import { BookOpen, HelpCircle, FileText, Star, ScrollText, Plus, Pencil, Trash2, X, Search, ExternalLink, Eye, EyeOff, CheckCircle, XCircle, MapPin } from 'lucide-react';
 import RichTextEditor from '@/components/RichTextEditor';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -221,48 +221,286 @@ function FaqTab() {
   );
 }
 
+const EMPTY_REVIEW = {
+  authorName: '', authorLastName: '', authorEmail: '', authorCity: '',
+  rating: 5, title: '', text: '', source: 'admin',
+  reviewDate: '', status: 'approved', published: true, featured: false,
+  sortOrder: 0, tourId: '', orderId: '', productId: '', saleOrderId: '', customerId: '',
+};
+
+const REVIEW_STATUS_BADGE: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-700',
+  approved: 'bg-green-100 text-green-700',
+  rejected: 'bg-red-100 text-red-500',
+};
+
+function ReviewForm({ form, setForm }: { form: any; setForm: any }) {
+  return (
+    <div className="px-6 py-4 space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <F label="Имя *">
+          <input value={form.authorName} onChange={e => setForm((f: any) => ({ ...f, authorName: e.target.value }))} className={inputCls} placeholder="Иван" />
+        </F>
+        <F label="Фамилия">
+          <input value={form.authorLastName} onChange={e => setForm((f: any) => ({ ...f, authorLastName: e.target.value }))} className={inputCls} placeholder="Петров" />
+        </F>
+        <F label="Email">
+          <input type="email" value={form.authorEmail} onChange={e => setForm((f: any) => ({ ...f, authorEmail: e.target.value }))} className={inputCls} />
+        </F>
+        <F label="Город">
+          <input value={form.authorCity} onChange={e => setForm((f: any) => ({ ...f, authorCity: e.target.value }))} className={inputCls} placeholder="Москва" />
+        </F>
+        <F label="Рейтинг">
+          <select value={form.rating} onChange={e => setForm((f: any) => ({ ...f, rating: +e.target.value }))} className={inputCls}>
+            {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n} {'★'.repeat(n)}</option>)}
+          </select>
+        </F>
+        <F label="Источник">
+          <select value={form.source} onChange={e => setForm((f: any) => ({ ...f, source: e.target.value }))} className={inputCls}>
+            {[['site', 'Сайт'], ['admin', 'Вручную'], ['yandex', 'Яндекс'], ['google', 'Google'], ['2gis', '2GIS'], ['vk', 'ВКонтакте']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </F>
+        <F label="Статус">
+          <select value={form.status} onChange={e => setForm((f: any) => ({ ...f, status: e.target.value }))} className={inputCls}>
+            {REVIEW_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </F>
+        <F label="Дата отзыва">
+          <input type="date" value={form.reviewDate ? form.reviewDate.slice(0, 10) : ''} onChange={e => setForm((f: any) => ({ ...f, reviewDate: e.target.value || null }))} className={inputCls} />
+        </F>
+        <F label="ID клиента CRM">
+          <input type="number" value={form.customerId} onChange={e => setForm((f: any) => ({ ...f, customerId: e.target.value }))} className={inputCls} placeholder="Необязательно" />
+        </F>
+        <F label="Порядок">
+          <input type="number" value={form.sortOrder} onChange={e => setForm((f: any) => ({ ...f, sortOrder: +e.target.value }))} className={inputCls} />
+        </F>
+      </div>
+      <F label="Заголовок">
+        <input value={form.title} onChange={e => setForm((f: any) => ({ ...f, title: e.target.value }))} className={inputCls} placeholder="Заголовок отзыва (необязательно)" />
+      </F>
+      <F label="Текст отзыва *">
+        <textarea value={form.text} onChange={e => setForm((f: any) => ({ ...f, text: e.target.value }))} className={inputCls + ' resize-none'} rows={4} placeholder="Текст отзыва..." />
+      </F>
+      <div className="flex gap-6">
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" checked={form.published} onChange={e => setForm((f: any) => ({ ...f, published: e.target.checked }))} className="rounded" />
+          Опубликован на сайте
+        </label>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" checked={form.featured} onChange={e => setForm((f: any) => ({ ...f, featured: e.target.checked }))} className="rounded" />
+          Рекомендуемый
+        </label>
+      </div>
+    </div>
+  );
+}
+
 function ReviewsTab() {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { data: reviews = [], isLoading } = useQuery<any[]>({ queryKey: ['reviews'], queryFn: () => api.get('/content/reviews/admin') });
+  const [search, setSearch] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [form, setForm] = useState<any>(EMPTY_REVIEW);
 
-  const updateMut = useMutation({
-    mutationFn: ({ id, data }: any) => api.patch(`/content/reviews/${id}`, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['reviews'] }); toast({ title: 'Статус обновлён' }); },
+  const { data: reviews = [], isLoading } = useQuery<any[]>({
+    queryKey: ['reviews'],
+    queryFn: () => api.get('/content/reviews/admin'),
+  });
+
+  const createMut = useMutation({
+    mutationFn: (d: any) => api.post('/content/reviews/admin', d),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['reviews'] });
+      toast({ title: 'Отзыв добавлен' });
+      setCreating(false);
+      setForm(EMPTY_REVIEW);
+    },
     onError: (e: any) => toast({ title: 'Ошибка', description: e.message, variant: 'destructive' }),
   });
 
-  const STATUS_BADGE: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-700', approved: 'bg-green-100 text-green-700', rejected: 'bg-red-100 text-red-500',
+  const updateMut = useMutation({
+    mutationFn: ({ id, data }: any) => api.patch(`/content/reviews/${id}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['reviews'] });
+      toast({ title: 'Сохранено' });
+      setEditing(null);
+    },
+    onError: (e: any) => toast({ title: 'Ошибка', description: e.message, variant: 'destructive' }),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => api.delete(`/content/reviews/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['reviews'] });
+      toast({ title: 'Отзыв удалён' });
+      setDeletingId(null);
+    },
+    onError: (e: any) => toast({ title: 'Ошибка', description: e.message, variant: 'destructive' }),
+  });
+
+  const quickUpdate = (id: number, data: any) => updateMut.mutate({ id, data });
+
+  const openEdit = (r: any) => {
+    setForm({
+      authorName: r.authorName || '',
+      authorLastName: r.authorLastName || '',
+      authorEmail: r.authorEmail || '',
+      authorCity: r.authorCity || '',
+      rating: r.rating || 5,
+      title: r.title || '',
+      text: r.text || '',
+      source: r.source || 'site',
+      reviewDate: r.reviewDate || '',
+      status: r.status || 'pending',
+      published: !!r.published,
+      featured: !!r.featured,
+      sortOrder: r.sortOrder || 0,
+      tourId: r.tourId || '',
+      orderId: r.orderId || '',
+      productId: r.productId || '',
+      saleOrderId: r.saleOrderId || '',
+      customerId: r.customerId || '',
+    });
+    setEditing(r);
   };
 
-  return isLoading ? <div className="flex justify-center py-8"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
-    : reviews.length === 0 ? <div className="text-center py-8 text-gray-400"><Star className="w-10 h-10 mx-auto mb-2 opacity-30" /><p>Отзывов нет</p></div>
-    : (
-      <div className="space-y-3">
-        {reviews.map((r: any) => (
-          <div key={r.id} className="bg-white border border-gray-100 rounded-xl p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-medium text-sm text-gray-900">{r.authorName}</span>
-                  <span className="text-yellow-500 text-sm">{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</span>
-                </div>
-                {r.title && <div className="text-sm font-medium text-gray-700 mb-1">{r.title}</div>}
-                <div className="text-sm text-gray-600 line-clamp-3">{r.text}</div>
-                <div className="text-xs text-gray-400 mt-2">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('ru-RU') : ''}</div>
-              </div>
-              <div className="flex flex-col gap-2 flex-shrink-0">
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[r.status]}`}>{REVIEW_STATUSES.find(([v]) => v === r.status)?.[1]}</span>
-                <select value={r.status} onChange={e => updateMut.mutate({ id: r.id, data: { status: e.target.value } })} className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500">
-                  {REVIEW_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
-              </div>
-            </div>
-          </div>
-        ))}
+  const prepareForm = (f: any) => ({
+    ...f,
+    tourId: f.tourId ? +f.tourId : null,
+    orderId: f.orderId ? +f.orderId : null,
+    productId: f.productId ? +f.productId : null,
+    saleOrderId: f.saleOrderId ? +f.saleOrderId : null,
+    customerId: f.customerId ? +f.customerId : null,
+    reviewDate: f.reviewDate || null,
+  });
+
+  const filtered = reviews.filter((r: any) => {
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return (r.authorName || '').toLowerCase().includes(s)
+      || (r.authorLastName || '').toLowerCase().includes(s)
+      || (r.text || '').toLowerCase().includes(s)
+      || (r.authorCity || '').toLowerCase().includes(s);
+  });
+
+  if (isLoading) return <div className="flex justify-center py-8"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>;
+
+  return (
+    <>
+      <div className="flex gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск по автору, тексту, городу..." className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+        </div>
+        <button onClick={() => { setForm(EMPTY_REVIEW); setCreating(true); }} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700">
+          <Plus className="w-4 h-4" /> Добавить отзыв
+        </button>
       </div>
-    );
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-8 text-gray-400"><Star className="w-10 h-10 mx-auto mb-2 opacity-30" /><p>Отзывов нет</p></div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Автор</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Текст</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Рейтинг</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Опубл.</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Порядок</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Дата</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filtered.map((r: any) => (
+                <tr key={r.id} className="hover:bg-gray-50/50">
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-sm text-gray-900">{r.authorName} {r.authorLastName || ''}</div>
+                    {r.authorCity && <div className="text-xs text-gray-400 flex items-center gap-1"><MapPin className="w-3 h-3" />{r.authorCity}</div>}
+                    {r.source && r.source !== 'site' && <div className="text-xs text-gray-400">{r.source}</div>}
+                  </td>
+                  <td className="px-4 py-3 max-w-xs">
+                    {r.title && <div className="text-xs font-medium text-gray-700 mb-0.5">{r.title}</div>}
+                    <div className="text-xs text-gray-500 line-clamp-2">{r.text?.replace(/<[^>]*>/g, '') || ''}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-yellow-500 text-sm">{'★'.repeat(r.rating || 5)}{'☆'.repeat(5 - (r.rating || 5))}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${REVIEW_STATUS_BADGE[r.status] || 'bg-gray-100 text-gray-500'}`}>
+                      {REVIEW_STATUSES.find(([v]) => v === r.status)?.[1] || r.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button onClick={() => quickUpdate(r.id, { published: !r.published })} title={r.published ? 'Скрыть' : 'Опубликовать'} className="p-1 rounded hover:bg-gray-100">
+                      {r.published ? <Eye className="w-4 h-4 text-green-600" /> : <EyeOff className="w-4 h-4 text-gray-400" />}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{r.sortOrder ?? 0}</td>
+                  <td className="px-4 py-3 text-xs text-gray-400">
+                    {(r.reviewDate || r.createdAt) ? new Date(r.reviewDate || r.createdAt).toLocaleDateString('ru-RU') : '—'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-1 justify-end">
+                      {r.status === 'pending' && (
+                        <>
+                          <button onClick={() => quickUpdate(r.id, { status: 'approved' })} title="Одобрить" className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg">
+                            <CheckCircle className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => quickUpdate(r.id, { status: 'rejected' })} title="Отклонить" className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
+                            <XCircle className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                      <button onClick={() => openEdit(r)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => setDeletingId(r.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {(creating || editing) && (
+        <Modal title={creating ? 'Новый отзыв' : 'Редактировать отзыв'} onClose={() => { setCreating(false); setEditing(null); }}>
+          <ReviewForm form={form} setForm={setForm} />
+          <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+            <button onClick={() => { setCreating(false); setEditing(null); }} className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium">Отмена</button>
+            <button
+              onClick={() => creating ? createMut.mutate(prepareForm(form)) : updateMut.mutate({ id: editing.id, data: prepareForm(form) })}
+              disabled={createMut.isPending || updateMut.isPending || !form.authorName || !form.text}
+              className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              {(createMut.isPending || updateMut.isPending) ? 'Сохранение...' : 'Сохранить'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {deletingId !== null && (
+        <Modal title="Удалить отзыв?" onClose={() => setDeletingId(null)}>
+          <div className="px-6 py-4"><p className="text-sm text-gray-600">Отзыв будет удалён безвозвратно.</p></div>
+          <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+            <button onClick={() => setDeletingId(null)} className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium">Отмена</button>
+            <button onClick={() => deleteMut.mutate(deletingId!)} disabled={deleteMut.isPending} className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 disabled:opacity-50">
+              {deleteMut.isPending ? 'Удаление...' : 'Удалить'}
+            </button>
+          </div>
+        </Modal>
+      )}
+    </>
+  );
 }
 
 function PagesTab() {

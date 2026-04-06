@@ -8,8 +8,10 @@ export type CommunicationChannel = typeof COMMUNICATION_CHANNELS[number];
 export const customersTable = pgTable("customers", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  lastName: text("last_name"),
   phone: text("phone").notNull(),
   email: text("email"),
+  city: text("city"),
   communicationChannel: text("communication_channel").$type<CommunicationChannel>(),
   telegramChatId: text("telegram_chat_id"),
   notes: text("notes"),
