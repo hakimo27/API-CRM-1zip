@@ -1,13 +1,16 @@
 import { Injectable, NotFoundException, Inject } from "@nestjs/common";
-import { eq, desc, or, ilike } from "drizzle-orm";
+import { eq, desc, count, inArray, or } from "drizzle-orm";
 import { DB_TOKEN } from "../database/database.module.js";
 import {
   customersTable,
   ordersTable,
   chatSessionsTable,
+  chatMessagesTable,
   saleOrdersTable,
   tourBookingsTable,
   usersTable,
+  reviewsTable,
+  feedbackReportsTable,
 } from "@workspace/db";
 
 type DrizzleDb = typeof import("@workspace/db").db;
@@ -51,8 +54,8 @@ export class CustomersService {
 
     if (!customer) throw new NotFoundException("Клиент не найден");
 
-    // Rental orders are linked directly by customerId
-    const [orders, chatSessions] = await Promise.all([
+    // Rental orders and chat sessions linked directly by customerId
+    const [orders, chatSessions, reviews] = await Promise.all([
       this.db
         .select()
         .from(ordersTable)
@@ -63,12 +66,48 @@ export class CustomersService {
         .select()
         .from(chatSessionsTable)
         .where(eq(chatSessionsTable.customerId, id))
-        .orderBy(desc(chatSessionsTable.createdAt))
-        .limit(10),
+        .orderBy(desc(chatSessionsTable.lastMessageAt), desc(chatSessionsTable.createdAt))
+        .limit(20),
+      this.db
+        .select()
+        .from(reviewsTable)
+        .where(eq(reviewsTable.customerId, id))
+        .orderBy(desc(reviewsTable.createdAt))
+        .limit(20),
     ]);
 
-    // Sale orders: find user with matching email, then load their sale orders.
-    // Also try matching deliveryAddress->phone via raw approach if needed.
+    // Enrich chat sessions with message counts
+    let enrichedChatSessions = chatSessions;
+    if (chatSessions.length > 0) {
+      const sessionIds = chatSessions.map((s) => s.id);
+      const msgCounts = await this.db
+        .select({ sessionId: chatMessagesTable.sessionId, count: count() })
+        .from(chatMessagesTable)
+        .where(inArray(chatMessagesTable.sessionId, sessionIds))
+        .groupBy(chatMessagesTable.sessionId);
+      const countMap: Record<number, number> = {};
+      for (const row of msgCounts) countMap[row.sessionId] = Number(row.count);
+      enrichedChatSessions = chatSessions.map((s) => ({ ...s, messageCount: countMap[s.id] || 0 }));
+    }
+
+    // Feedback reports matched by phone or email
+    let feedbackReports: any[] = [];
+    if (customer.phone || customer.email) {
+      const allFeedback = await this.db
+        .select()
+        .from(feedbackReportsTable)
+        .orderBy(desc(feedbackReportsTable.createdAt))
+        .limit(100);
+      feedbackReports = allFeedback.filter((f) => {
+        const contact = (f.contact || "").toLowerCase();
+        return (
+          (customer.phone && contact.includes(customer.phone.replace(/\D/g, "").slice(-7))) ||
+          (customer.email && contact.includes(customer.email.toLowerCase()))
+        );
+      });
+    }
+
+    // Sale orders and tour bookings: link via email → user lookup
     let saleOrders: any[] = [];
     let tourBookings: any[] = [];
 
@@ -97,7 +136,7 @@ export class CustomersService {
       }
     }
 
-    // Tour bookings also store contactPhone directly — match by phone as fallback
+    // Tour bookings: also match directly by phone (contactPhone field)
     if (tourBookings.length === 0 && customer.phone) {
       tourBookings = await this.db
         .select()
@@ -107,7 +146,8 @@ export class CustomersService {
         .limit(20);
     }
 
-    const totalOrders = orders.length;
+    const totalOrders =
+      orders.length + saleOrders.length + tourBookings.length;
     const totalRevenue =
       orders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0) +
       saleOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
@@ -120,8 +160,10 @@ export class CustomersService {
       orders,
       saleOrders,
       tourBookings,
-      chatSessions,
-      stats: { totalOrders: totalOrders + saleOrders.length + tourBookings.length, totalRevenue, activeOrders },
+      reviews,
+      feedbackReports,
+      chatSessions: enrichedChatSessions,
+      stats: { totalOrders, totalRevenue, activeOrders },
     };
   }
 

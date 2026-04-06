@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   User, MessageSquare, ArrowLeft, ShoppingBag,
   Edit2, Check, X, TrendingUp, Package, AlertCircle, Store, Tent,
+  Star, FileText, Clock,
 } from 'lucide-react';
 import { PhoneInput } from '@/components/PhoneInput';
 
@@ -19,10 +20,14 @@ const STATUS_BADGE: Record<string, string> = {
   active: 'bg-green-100 text-green-700',
   open: 'bg-blue-100 text-blue-700',
   closed: 'bg-gray-100 text-gray-600',
+  resolved: 'bg-green-100 text-green-700',
+  archived: 'bg-gray-100 text-gray-500',
   processing: 'bg-blue-100 text-blue-700',
   shipped: 'bg-purple-100 text-purple-700',
   delivered: 'bg-green-100 text-green-700',
   refunded: 'bg-orange-100 text-orange-700',
+  approved: 'bg-green-100 text-green-700',
+  rejected: 'bg-red-100 text-red-700',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -35,10 +40,14 @@ const STATUS_LABELS: Record<string, string> = {
   active: 'Активен',
   open: 'Открыт',
   closed: 'Закрыт',
+  resolved: 'Решён',
+  archived: 'Архив',
   processing: 'Обработка',
   shipped: 'Отправлен',
   delivered: 'Доставлен',
   refunded: 'Возврат',
+  approved: 'Одобрен',
+  rejected: 'Отклонён',
 };
 
 const CHANNEL_LABELS: Record<string, string> = {
@@ -53,6 +62,11 @@ const CHANNEL_LABELS: Record<string, string> = {
 function fmt(date: string | null | undefined) {
   if (!date) return '—';
   return new Date(date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function fmtDateTime(date: string | null | undefined) {
+  if (!date) return '—';
+  return new Date(date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function fmtMoney(val: any) {
@@ -91,7 +105,7 @@ function EditableField({ label, value, onSave, type = 'text' }: EditableFieldPro
         </div>
       ) : (
         <div className="flex items-center gap-1 flex-1 group">
-          <span className="text-sm text-gray-800">{value || <span className="text-gray-400">—</span>}</span>
+          <span className="text-sm text-gray-800">{value || <span className="text-gray-400 italic text-xs">не указано</span>}</span>
           <button onClick={() => { setDraft(value); setEditing(true); }} className="ml-1 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded opacity-0 group-hover:opacity-100 transition-opacity">
             <Edit2 className="w-3 h-3" />
           </button>
@@ -101,13 +115,15 @@ function EditableField({ label, value, onSave, type = 'text' }: EditableFieldPro
   );
 }
 
-type TabKey = 'rentals' | 'purchases' | 'tours' | 'chats';
+type TabKey = 'rentals' | 'purchases' | 'tours' | 'reviews' | 'requests' | 'chats';
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
-  { key: 'rentals', label: 'Аренды', icon: <ShoppingBag className="w-4 h-4" /> },
-  { key: 'purchases', label: 'Покупки', icon: <Store className="w-4 h-4" /> },
-  { key: 'tours', label: 'Туры', icon: <Tent className="w-4 h-4" /> },
-  { key: 'chats', label: 'Чаты', icon: <MessageSquare className="w-4 h-4" /> },
+  { key: 'rentals', label: 'Аренды', icon: <ShoppingBag className="w-3.5 h-3.5" /> },
+  { key: 'purchases', label: 'Покупки', icon: <Store className="w-3.5 h-3.5" /> },
+  { key: 'tours', label: 'Туры', icon: <Tent className="w-3.5 h-3.5" /> },
+  { key: 'reviews', label: 'Отзывы', icon: <Star className="w-3.5 h-3.5" /> },
+  { key: 'requests', label: 'Заявки', icon: <FileText className="w-3.5 h-3.5" /> },
+  { key: 'chats', label: 'Чаты', icon: <MessageSquare className="w-3.5 h-3.5" /> },
 ];
 
 export default function CustomerDetailPage({ id }: { id: string }) {
@@ -154,14 +170,28 @@ export default function CustomerDetailPage({ id }: { id: string }) {
   const orders: any[] = customer.orders || [];
   const saleOrders: any[] = customer.saleOrders || [];
   const tourBookings: any[] = customer.tourBookings || [];
+  const reviews: any[] = customer.reviews || [];
+  const feedbackReports: any[] = customer.feedbackReports || [];
   const chatSessions: any[] = customer.chatSessions || [];
 
   const tabCounts: Record<TabKey, number> = {
     rentals: orders.length,
     purchases: saleOrders.length,
     tours: tourBookings.length,
+    reviews: reviews.length,
+    requests: feedbackReports.length,
     chats: chatSessions.length,
   };
+
+  function EmptyState({ icon, label, hint }: { icon: React.ReactNode; label: string; hint?: string }) {
+    return (
+      <div className="text-center py-10 text-gray-400">
+        <div className="w-10 h-10 mx-auto mb-2 opacity-30">{icon}</div>
+        <p className="text-sm">{label}</p>
+        {hint && <p className="text-xs mt-1 text-gray-300">{hint}</p>}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -179,18 +209,15 @@ export default function CustomerDetailPage({ id }: { id: string }) {
         <div className="ml-auto flex items-center gap-2 flex-wrap">
           <Link href={`/orders/new?customerId=${customer.id}&customerName=${encodeURIComponent(customer.name)}&customerPhone=${encodeURIComponent(customer.phone || '')}&customerEmail=${encodeURIComponent(customer.email || '')}`}
             className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-xl hover:bg-blue-700 transition-colors">
-            <ShoppingBag className="w-4 h-4" />
-            Аренда
+            <ShoppingBag className="w-4 h-4" /> Аренда
           </Link>
           <Link href={`/sale-orders/new?customerId=${customer.id}&customerName=${encodeURIComponent(customer.name)}&customerPhone=${encodeURIComponent(customer.phone || '')}&customerEmail=${encodeURIComponent(customer.email || '')}`}
             className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white text-sm rounded-xl hover:bg-green-700 transition-colors">
-            <Store className="w-4 h-4" />
-            Продажа
+            <Store className="w-4 h-4" /> Продажа
           </Link>
           <Link href={`/chat?customerId=${customer.id}`}
             className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 text-gray-700 text-sm rounded-xl hover:bg-gray-50 transition-colors">
-            <MessageSquare className="w-4 h-4" />
-            Написать
+            <MessageSquare className="w-4 h-4" /> Написать
           </Link>
         </div>
       </div>
@@ -203,7 +230,7 @@ export default function CustomerDetailPage({ id }: { id: string }) {
           </div>
           <div>
             <p className="text-2xl font-bold text-gray-900">{stats.totalOrders}</p>
-            <p className="text-xs text-gray-500">Заказов всего</p>
+            <p className="text-xs text-gray-500">Заказов</p>
           </div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-3">
@@ -272,16 +299,16 @@ export default function CustomerDetailPage({ id }: { id: string }) {
           )}
         </div>
 
-        {/* Right: Tabbed history */}
+        {/* Right: History tabs */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
             {/* Tab bar */}
-            <div className="flex border-b border-gray-100">
+            <div className="flex border-b border-gray-100 overflow-x-auto">
               {TABS.map(tab => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium transition-colors flex-1 justify-center ${
+                  className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium transition-colors flex-shrink-0 ${
                     activeTab === tab.key
                       ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/40'
                       : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
@@ -302,26 +329,24 @@ export default function CustomerDetailPage({ id }: { id: string }) {
 
             {/* Tab content */}
             <div className="p-5">
-              {/* Rentals tab */}
+
+              {/* ── Аренды ── */}
               {activeTab === 'rentals' && (
-                <div>
+                <>
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-gray-900">История аренды</h3>
+                    <h3 className="font-semibold text-gray-900 text-sm">История аренды</h3>
                     <Link href={`/orders/new?customerId=${customer.id}&customerName=${encodeURIComponent(customer.name)}`}
                       className="text-xs text-blue-600 hover:underline">+ Новый заказ</Link>
                   </div>
                   {orders.length === 0 ? (
-                    <div className="text-center py-8 text-gray-400">
-                      <ShoppingBag className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">Заказов аренды нет</p>
-                    </div>
+                    <EmptyState icon={<ShoppingBag />} label="Заказов аренды нет" />
                   ) : (
                     <div className="space-y-2">
                       {orders.map((order: any) => (
                         <Link key={order.id} href={`/orders/${order.id}`}
                           className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:border-blue-200 hover:bg-blue-50 transition-all">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
                               <ShoppingBag className="w-4 h-4 text-blue-600" />
                             </div>
                             <div>
@@ -339,32 +364,27 @@ export default function CustomerDetailPage({ id }: { id: string }) {
                       ))}
                     </div>
                   )}
-                </div>
+                </>
               )}
 
-              {/* Purchases tab */}
+              {/* ── Покупки ── */}
               {activeTab === 'purchases' && (
-                <div>
+                <>
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-gray-900">История покупок</h3>
+                    <h3 className="font-semibold text-gray-900 text-sm">История покупок</h3>
                     <Link href={`/sale-orders/new?customerId=${customer.id}&customerName=${encodeURIComponent(customer.name)}`}
                       className="text-xs text-blue-600 hover:underline">+ Новый заказ</Link>
                   </div>
                   {saleOrders.length === 0 ? (
-                    <div className="text-center py-8 text-gray-400">
-                      <Store className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">Покупок нет</p>
-                      {!customer.email && (
-                        <p className="text-xs mt-1 text-gray-300">Для связи покупок укажите email клиента</p>
-                      )}
-                    </div>
+                    <EmptyState icon={<Store />} label="Покупок нет"
+                      hint={!customer.email ? 'Для автосвязи покупок укажите email клиента' : undefined} />
                   ) : (
                     <div className="space-y-2">
                       {saleOrders.map((so: any) => (
                         <Link key={so.id} href={`/sale-orders/${so.id}`}
                           className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:border-green-200 hover:bg-green-50 transition-all">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
                               <Store className="w-4 h-4 text-green-600" />
                             </div>
                             <div>
@@ -382,28 +402,23 @@ export default function CustomerDetailPage({ id }: { id: string }) {
                       ))}
                     </div>
                   )}
-                </div>
+                </>
               )}
 
-              {/* Tours tab */}
+              {/* ── Туры ── */}
               {activeTab === 'tours' && (
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-4">Бронирования туров</h3>
+                <>
+                  <h3 className="font-semibold text-gray-900 text-sm mb-4">Бронирования туров</h3>
                   {tourBookings.length === 0 ? (
-                    <div className="text-center py-8 text-gray-400">
-                      <Tent className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">Бронирований туров нет</p>
-                      {!customer.email && (
-                        <p className="text-xs mt-1 text-gray-300">Для связи туров укажите email или телефон клиента</p>
-                      )}
-                    </div>
+                    <EmptyState icon={<Tent />} label="Бронирований туров нет"
+                      hint={!customer.email && !customer.phone ? 'Укажите email или телефон для автосвязи' : undefined} />
                   ) : (
                     <div className="space-y-2">
                       {tourBookings.map((tb: any) => (
                         <div key={tb.id}
                           className="flex items-center justify-between p-3 rounded-xl border border-gray-100">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                            <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
                               <Tent className="w-4 h-4 text-orange-600" />
                             </div>
                             <div>
@@ -424,46 +439,125 @@ export default function CustomerDetailPage({ id }: { id: string }) {
                       ))}
                     </div>
                   )}
-                </div>
+                </>
               )}
 
-              {/* Chats tab */}
-              {activeTab === 'chats' && (
-                <div>
+              {/* ── Отзывы ── */}
+              {activeTab === 'reviews' && (
+                <>
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-gray-900">Чаты</h3>
-                    <Link href="/chat" className="text-xs text-blue-600 hover:underline">Все чаты →</Link>
+                    <h3 className="font-semibold text-gray-900 text-sm">Отзывы клиента</h3>
+                    <Link href="/content?tab=reviews" className="text-xs text-blue-600 hover:underline">Все отзывы →</Link>
                   </div>
-                  {chatSessions.length === 0 ? (
-                    <div className="text-center py-8 text-gray-400">
-                      <MessageSquare className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">Чатов пока нет</p>
-                    </div>
+                  {reviews.length === 0 ? (
+                    <EmptyState icon={<Star />} label="Отзывов нет"
+                      hint="Отзывы появятся после привязки через ID клиента в форме отзыва" />
                   ) : (
-                    <div className="space-y-2">
-                      {chatSessions.map((session: any) => (
-                        <Link key={session.id} href="/chat"
-                          className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:border-blue-200 hover:bg-blue-50 transition-all">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                              <MessageSquare className="w-4 h-4 text-blue-600" />
+                    <div className="space-y-3">
+                      {reviews.map((r: any) => (
+                        <div key={r.id} className="p-3 rounded-xl border border-gray-100">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-yellow-500 text-sm">{'★'.repeat(r.rating || 5)}{'☆'.repeat(5 - (r.rating || 5))}</span>
+                                {r.title && <span className="text-sm font-medium text-gray-800">{r.title}</span>}
+                              </div>
+                              <p className="text-xs text-gray-600 line-clamp-2">{r.text?.replace(/<[^>]*>/g, '') || ''}</p>
+                              <p className="text-xs text-gray-400 mt-1">{fmt(r.reviewDate || r.createdAt)}</p>
                             </div>
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">Диалог #{session.id}</p>
-                              <p className="text-xs text-gray-500">
-                                {CHANNEL_LABELS[session.channel] || session.channel} · {fmt(session.createdAt)}
-                              </p>
-                            </div>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_BADGE[r.status] || 'bg-gray-100 text-gray-600'}`}>
+                              {STATUS_LABELS[r.status] || r.status}
+                            </span>
                           </div>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[session.status] || 'bg-gray-100 text-gray-600'}`}>
-                            {STATUS_LABELS[session.status] || session.status}
-                          </span>
-                        </Link>
+                        </div>
                       ))}
                     </div>
                   )}
-                </div>
+                </>
               )}
+
+              {/* ── Заявки ── */}
+              {activeTab === 'requests' && (
+                <>
+                  <h3 className="font-semibold text-gray-900 text-sm mb-4">Заявки и обращения</h3>
+                  {feedbackReports.length === 0 ? (
+                    <EmptyState icon={<FileText />} label="Заявок нет"
+                      hint={!customer.phone && !customer.email ? 'Укажите телефон или email для поиска заявок' : undefined} />
+                  ) : (
+                    <div className="space-y-2">
+                      {feedbackReports.map((fb: any) => (
+                        <div key={fb.id} className="p-3 rounded-xl border border-gray-100">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs font-medium text-gray-700">{fb.name}</span>
+                                <span className="text-xs text-gray-400">{fb.contact}</span>
+                              </div>
+                              <p className="text-xs text-gray-600 line-clamp-2">{fb.message}</p>
+                              {fb.pageUrl && <p className="text-xs text-gray-400 mt-1 font-mono truncate">{fb.pageUrl}</p>}
+                            </div>
+                            <span className="text-xs text-gray-400 flex-shrink-0">{fmt(fb.createdAt)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ── Чаты ── */}
+              {activeTab === 'chats' && (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-gray-900 text-sm">История диалогов</h3>
+                    <Link href="/chat" className="text-xs text-blue-600 hover:underline">Открыть чаты →</Link>
+                  </div>
+                  {chatSessions.length === 0 ? (
+                    <EmptyState icon={<MessageSquare />} label="Диалогов нет" />
+                  ) : (
+                    <div className="space-y-2">
+                      {chatSessions.map((session: any) => (
+                        <div key={session.id}
+                          className="flex items-start justify-between p-3 rounded-xl border border-gray-100 hover:border-blue-200 hover:bg-blue-50/30 transition-all">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <MessageSquare className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium text-gray-900">Диалог #{session.id}</p>
+                                {session.unreadCount > 0 && (
+                                  <span className="px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full font-semibold">{session.unreadCount}</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                {CHANNEL_LABELS[session.channel] || session.channel}
+                                {session.messageCount > 0 && ` · ${session.messageCount} сообщ.`}
+                              </p>
+                              <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                                <Clock className="w-3 h-3" />
+                                {session.lastMessageAt ? fmtDateTime(session.lastMessageAt) : fmt(session.createdAt)}
+                              </p>
+                              {session.orderId && (
+                                <p className="text-xs text-blue-500">Заказ #{session.orderId}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[session.status] || 'bg-gray-100 text-gray-600'}`}>
+                              {STATUS_LABELS[session.status] || session.status}
+                            </span>
+                            <Link href="/chat" className="text-xs text-blue-600 hover:underline whitespace-nowrap">
+                              Открыть →
+                            </Link>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
             </div>
           </div>
         </div>

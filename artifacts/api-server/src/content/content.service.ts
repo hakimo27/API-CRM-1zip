@@ -148,14 +148,6 @@ export class ContentService {
   async createReview(data: any) {
     const [created] = await this.db
       .insert(reviewsTable)
-      .values({ ...data, status: "pending", published: false })
-      .returning();
-    return created;
-  }
-
-  async createReviewAdmin(data: any) {
-    const [created] = await this.db
-      .insert(reviewsTable)
       .values({
         ...data,
         status: data.status ?? "pending",
@@ -163,6 +155,10 @@ export class ContentService {
       })
       .returning();
     return created;
+  }
+
+  async createReviewAdmin(data: any) {
+    return this.createReview(data);
   }
 
   async approveReview(id: number) {

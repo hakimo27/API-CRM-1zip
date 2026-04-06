@@ -310,7 +310,7 @@ function ReviewsTab() {
   });
 
   const createMut = useMutation({
-    mutationFn: (d: any) => api.post('/content/reviews/admin', d),
+    mutationFn: (d: any) => api.post('/content/reviews', d),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['reviews'] });
       toast({ title: 'Отзыв добавлен' });
