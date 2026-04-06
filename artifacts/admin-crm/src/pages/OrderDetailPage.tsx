@@ -110,6 +110,12 @@ export default function OrderDetailPage({ id }: { id: string }) {
     staleTime: 60_000,
   });
 
+  const { data: branches = [] } = useQuery<any[]>({
+    queryKey: ['branches-admin'],
+    queryFn: () => api.get('/branches/admin'),
+    staleTime: 120_000,
+  });
+
   const invalidate = () => qc.invalidateQueries({ queryKey: ['order-detail', numId] });
 
   const statusMut = useMutation({
@@ -601,9 +607,9 @@ export default function OrderDetailPage({ id }: { id: string }) {
           {/* Delivery */}
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
             <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Truck className="w-4 h-4 text-blue-600" /> Доставка
+              <Truck className="w-4 h-4 text-blue-600" /> Доставка / Самовывоз
             </h3>
-            <div className="space-y-2 text-sm">
+            <div className="space-y-3 text-sm">
               <div className="flex gap-2">
                 <button
                   onClick={() => updateMut.mutate({ deliveryType: 'pickup' })}
@@ -613,7 +619,7 @@ export default function OrderDetailPage({ id }: { id: string }) {
                       : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
                   }`}
                 >
-                  Самовывоз
+                  📍 Самовывоз
                 </button>
                 <button
                   onClick={() => updateMut.mutate({ deliveryType: 'delivery' })}
@@ -623,11 +629,47 @@ export default function OrderDetailPage({ id }: { id: string }) {
                       : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
                   }`}
                 >
-                  Доставка
+                  🚚 Доставка
                 </button>
               </div>
+
+              {(order.deliveryType === 'pickup' || !order.deliveryType) && (
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Точка самовывоза</label>
+                  {order.pickupBranchName ? (
+                    <div className="flex items-start gap-2 text-gray-700 bg-blue-50 rounded-xl px-3 py-2">
+                      <MapPin className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm font-medium text-blue-800">{order.pickupBranchName}</span>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">Точка не выбрана</p>
+                  )}
+                  {branches.length > 0 && (
+                    <select
+                      className="mt-2 w-full text-xs border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      defaultValue={order.pickupBranchId || ''}
+                      onChange={e => {
+                        const bid = e.target.value ? Number(e.target.value) : null;
+                        const branch = branches.find((b: any) => b.id === bid);
+                        updateMut.mutate({
+                          pickupBranchId: bid,
+                          pickupBranchName: branch
+                            ? (branch.address ? `${branch.name} (${branch.address})` : branch.name)
+                            : null,
+                        });
+                      }}
+                    >
+                      <option value="">— изменить точку самовывоза —</option>
+                      {branches.map((b: any) => (
+                        <option key={b.id} value={b.id}>{b.name}{b.address ? ` · ${b.address}` : ''}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
               {order.deliveryType === 'delivery' && (
-                <div className="mt-2">
+                <div>
                   <label className="block text-xs text-gray-400 mb-1">Адрес доставки</label>
                   <div className="flex items-start gap-2 text-gray-700">
                     <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />

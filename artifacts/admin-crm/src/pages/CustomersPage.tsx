@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Users, Search, Phone, Mail, ShoppingBag, Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Link } from 'wouter';
+import { Users, Search, Phone, Mail, ShoppingBag, Plus, Pencil, Trash2, X, ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { PhoneInput } from '@/components/PhoneInput';
@@ -138,6 +139,10 @@ export default function CustomersPage() {
                     <td className="px-6 py-4 text-sm font-medium">{Number(c.totalSpent || 0).toLocaleString('ru-RU')} ₽</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1 justify-end">
+                        <Link href={`/customers/${c.id}`}
+                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                          <ExternalLink className="w-3.5 h-3.5" /> Карточка
+                        </Link>
                         <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Pencil className="w-4 h-4" /></button>
                         <button onClick={() => setDeletingId(c.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                       </div>

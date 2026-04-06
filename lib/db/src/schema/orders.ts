@@ -43,6 +43,8 @@ export const ordersTable = pgTable("orders", {
   totalDeposit: numeric("total_deposit", { precision: 10, scale: 2 }),
   privacyAccepted: boolean("privacy_accepted").notNull().default(false),
   assignedManagerId: integer("assigned_manager_id"),
+  pickupBranchId: integer("pickup_branch_id"),
+  pickupBranchName: text("pickup_branch_name"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

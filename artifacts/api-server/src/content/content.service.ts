@@ -145,13 +145,25 @@ export class ContentService {
     return reviews;
   }
 
+  private normalizeReviewDates(data: any): any {
+    const result = { ...data };
+    if (result.reviewDate !== undefined && result.reviewDate !== null) {
+      if (typeof result.reviewDate === "string") {
+        const d = new Date(result.reviewDate);
+        result.reviewDate = isNaN(d.getTime()) ? null : d;
+      }
+    }
+    return result;
+  }
+
   async createReview(data: any) {
+    const normalized = this.normalizeReviewDates(data);
     const [created] = await this.db
       .insert(reviewsTable)
       .values({
-        ...data,
-        status: data.status ?? "pending",
-        published: data.published ?? false,
+        ...normalized,
+        status: normalized.status ?? "pending",
+        published: normalized.published ?? false,
       })
       .returning();
     return created;
@@ -220,7 +232,8 @@ export class ContentService {
   }
 
   async updateReview(id: number, data: any) {
-    const [updated] = await this.db.update(reviewsTable).set({ ...data, updatedAt: new Date() }).where(eq(reviewsTable.id, id)).returning();
+    const normalized = this.normalizeReviewDates(data);
+    const [updated] = await this.db.update(reviewsTable).set({ ...normalized, updatedAt: new Date() }).where(eq(reviewsTable.id, id)).returning();
     if (!updated) throw new NotFoundException("Отзыв не найден");
     return updated;
   }

@@ -16,6 +16,7 @@ import {
   customersTable,
   inventoryUnitsTable,
   settingsTable,
+  branchesTable,
 } from "@workspace/db";
 import { AvailabilityService } from "../availability/availability.service.js";
 import { PricingService } from "../pricing/pricing.service.js";
@@ -300,6 +301,22 @@ export class OrdersService {
 
     const orderNumber = generateOrderNumber();
 
+    // Resolve pickup branch name when delivery type is pickup
+    let pickupBranchId: number | undefined;
+    let pickupBranchName: string | undefined;
+    const resolvedBranchId = dto.branchId || dto.pickupPointId;
+    if (resolvedBranchId && (dto.deliveryType === "pickup" || !dto.deliveryType)) {
+      const [branch] = await this.db
+        .select({ id: branchesTable.id, name: branchesTable.name, address: branchesTable.address })
+        .from(branchesTable)
+        .where(eq(branchesTable.id, resolvedBranchId))
+        .limit(1);
+      if (branch) {
+        pickupBranchId = branch.id;
+        pickupBranchName = branch.address ? `${branch.name} (${branch.address})` : branch.name;
+      }
+    }
+
     const orderValues: any = {
       orderNumber,
       customerId,
@@ -310,6 +327,8 @@ export class OrdersService {
       depositPaid: dto.depositPaid ?? false,
       deliveryType: dto.deliveryType || "pickup",
       deliveryAddress: dto.deliveryAddress || undefined,
+      pickupBranchId: pickupBranchId ?? undefined,
+      pickupBranchName: pickupBranchName ?? undefined,
     };
 
     if (startDate) orderValues.startDate = startDate;
