@@ -1,6 +1,7 @@
 // Байдабаза CRM Service Worker
-const CACHE_NAME = 'baidabaza-crm-v2';
-const SHELL_ASSETS = ['/crm/', '/crm/index.html', '/crm/offline.html'];
+const CACHE_NAME = 'baidabaza-crm-v3';
+const BASE = '/crm/';
+const SHELL_ASSETS = [BASE, BASE + 'index.html', BASE + 'offline.html'];
 
 // ─── Install: cache shell ─────────────────────────────────────────────────
 self.addEventListener('install', event => {
@@ -20,26 +21,35 @@ self.addEventListener('activate', event => {
   );
 });
 
-// ─── Fetch: network-first, fallback to cache for navigation ──────────────
+// ─── Fetch ────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
   // Only handle same-origin requests
   if (url.origin !== location.origin) return;
 
-  // For API/WebSocket requests, always go network
-  if (url.pathname.startsWith('/api/')) return;
-  if (url.pathname.startsWith('/socket.io/')) return;
+  // Never intercept API / WebSocket
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/socket.io/')) return;
 
-  // For navigation requests: network-first, fallback to offline page
+  // ── Navigation requests: network-first, fall back to SPA shell ──────────
+  // Critically: even a non-2xx HTTP response (e.g. Vite 404 in dev) should
+  // fall back to index.html so the SPA router can handle the route.
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(async () => {
-        const cached = await caches.match(event.request);
-        if (cached) return cached;
-        const shell = await caches.match('/crm/index.html');
+      fetch(event.request).then(response => {
+        // If the server returned a successful HTML page, use it.
+        if (response.ok && response.headers.get('content-type')?.includes('text/html')) {
+          return response;
+        }
+        // Server returned an error (e.g. 404) — serve the SPA shell instead.
+        return caches.match(BASE + 'index.html').then(shell =>
+          shell || caches.match(BASE) || response
+        );
+      }).catch(async () => {
+        // Network failure (offline) — try cached shell, then offline page.
+        const shell = await caches.match(BASE + 'index.html') || await caches.match(BASE);
         if (shell) return shell;
-        const offline = await caches.match('/crm/offline.html');
+        const offline = await caches.match(BASE + 'offline.html');
         return offline || new Response('Нет подключения к сети', {
           status: 503,
           headers: { 'Content-Type': 'text/plain; charset=utf-8' }
@@ -49,7 +59,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // For static assets: cache-first (JS/CSS/fonts/images)
+  // ── Static assets: cache-first (JS/CSS/fonts/images fingerprinted by Vite) ─
   if (url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|webp)$/)) {
     event.respondWith(
       caches.match(event.request).then(cached => {
@@ -66,7 +76,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // For other requests: network-first
+  // ── Everything else: network-first ────────────────────────────────────────
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request))
   );
@@ -84,10 +94,10 @@ self.addEventListener('push', event => {
   const title = data.title || 'Байдабаза CRM';
   const options = {
     body: data.body || 'У вас новое уведомление',
-    icon: '/crm/icons/icon-192.png',
-    badge: '/crm/icons/icon-192.png',
+    icon: BASE + 'icons/icon-192.png',
+    badge: BASE + 'icons/icon-192.png',
     tag: data.tag || 'baidabaza-crm-notification',
-    data: { url: data.url || '/crm/' },
+    data: { url: data.url || BASE },
     vibrate: [200, 100, 200],
     requireInteraction: data.requireInteraction || false,
     actions: data.actions || [],
@@ -100,14 +110,14 @@ self.addEventListener('push', event => {
 self.addEventListener('notificationclick', event => {
   event.notification.close();
 
-  const targetUrl = event.notification.data?.url || '/crm/';
+  const targetUrl = event.notification.data?.url || BASE;
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
       const existing = clients.find(c => c.url.includes('/crm'));
       if (existing) {
         existing.focus();
-        if (targetUrl !== '/crm/') existing.navigate(targetUrl);
+        if (targetUrl !== BASE) existing.navigate(targetUrl);
         return;
       }
       return self.clients.openWindow(targetUrl);
